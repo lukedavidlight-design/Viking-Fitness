@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Viking Fitness — Fitness Log</title>
+<meta name="theme-color" content="#060A10" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Viking Fitness" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  :root{
+    --bg: #060A10;
+    --panel: #F3F6FA;
+    --panel-ink: #10151C;
+    --panel-ink-soft: #5B6472;
+    --panel-line: #E1E6ED;
+    --ink: #E7ECF2;
+    --ink-soft: #8B96A5;
+    --navy: #0B1119;
+    --navy-soft: #151E2B;
+    --accent: #33C7E8;
+    --accent-deep: #1C97B3;
+    --amber: #FFB454;
+    --danger: #FF6B6B;
+    --danger-deep: #D6473F;
+    --success: #34D399;
+    --radius: 18px;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    background-image:
+      radial-gradient(600px circle at 15% 0%, rgba(51,199,232,0.16), transparent 60%),
+      radial-gradient(500px circle at 100% 10%, rgba(255,180,84,0.10), transparent 55%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding-bottom: calc(24px + var(--safe-bottom));
+  }
+
+  .brand-head{
+    padding: calc(14px + var(--safe-top)) 18px 14px;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  }
+  .brand-row{ display:flex; align-items:baseline; gap:9px; }
+  .brand-title{
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-size: 21px;
+    margin:0;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .brand-blaze{
+    display:inline-block; width:9px; height:9px; border-radius:50%;
+    background: var(--accent); box-shadow: 0 0 10px var(--accent);
+    flex-shrink:0; margin-bottom:2px;
+  }
+  .brand-sub{
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .settings-gear{
+    background: var(--navy-soft); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; width: 38px; height: 38px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color: var(--ink-soft);
+  }
+  .settings-gear svg{ width:18px; height:18px; }
+  .settings-gear.active{ color: var(--accent); border-color: var(--accent); }
+  .streak-badge{
+    display:flex; align-items:center; gap:5px;
+    background: var(--navy-soft); border: 1px solid rgba(255,180,84,0.35);
+    border-radius: 999px; padding: 7px 12px 7px 10px; flex-shrink:0;
+  }
+  .streak-badge svg{ width:16px; height:16px; filter: drop-shadow(0 0 4px rgba(255,180,84,0.8)); }
+  .streak-badge span{ font-family: var(--mono); font-weight:800; font-size:13px; color: var(--amber); }
+  .streak-badge.zero svg{ filter:none; opacity:0.35; }
+  .streak-badge.zero span{ color: var(--ink-soft); }
+
+  nav.tabbar-top{
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(11,17,25,0.92);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    display:flex;
+    justify-content: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 4px;
+    gap: 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  nav.tabbar-top::-webkit-scrollbar{ display:none; }
+  .tab-btn{
+    flex: 0 1 auto;
+    background: transparent; color: var(--ink-soft);
+    border-radius: 10px; padding: 7px 9px;
+    display:flex; flex-direction: column; align-items:center; gap:3px;
+    font-size: 9px; letter-spacing: 0.03em; text-transform: uppercase; font-weight:700;
+    white-space: nowrap;
+  }
+  .tab-btn svg{ width:19px; height:19px; }
+  .tab-btn.active{ color: var(--accent); background: rgba(51,199,232,0.10); }
+
+  main{ max-width: 640px; margin: 0 auto; padding: 14px 14px 0; }
+
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+  }
+  .card h2{
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--panel-ink-soft);
+    margin: 0 0 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card h2::before{
+    content:""; width:14px; height:3px; border-radius:2px; background: var(--accent); display:inline-block; flex-shrink:0;
+  }
+
+  .stat-stack{ display:flex; flex-direction:column; gap: 10px; }
+  .stat-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat{
+    background: #FFFFFF;
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 12px;
+    min-width: 0;
+  }
+  .stat-label{ font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--panel-ink-soft); }
+  .stat-value{ font-family: var(--mono); font-size: 22px; font-weight: 700; margin-top: 4px; word-break: break-word; color: var(--panel-ink); }
+  .stat-unit{ font-size: 12px; color: var(--panel-ink-soft); font-weight: 400; margin-left: 3px;}
+  .stat-range-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px; }
+  .stat-range-head select{
+    width:auto; margin-bottom:0; padding: 4px 6px; font-size: 10px; text-transform:uppercase;
+    letter-spacing:0.04em; font-family: var(--mono); font-weight:700; color: var(--panel-ink-soft);
+    border-radius:6px; flex-shrink:0;
+  }
+  .stat-range-custom{ margin-top:8px; }
+  .stat-range-custom .field-row{ margin-bottom:0; }
+  .stat-range-custom input{ margin-bottom:8px; font-size:13px; padding:8px 10px; }
+
+  /* Dial stat */
+  .dial-stat{ display:flex; align-items:center; gap:14px; background:#fff; border:1px solid var(--panel-line); border-radius:14px; padding:12px; }
+  .dial-stat svg{ flex-shrink:0; }
+  .dial-value{ font-family: var(--mono); font-size: 20px; font-weight:800; color: var(--panel-ink); }
+  .dial-label{ font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--panel-ink-soft); margin-top:2px; }
+
+  label{ display:block; font-size: 11px; color: var(--panel-ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  input, select, textarea{
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 15px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-line);
+    background: #fff;
+    color: var(--panel-ink);
+    margin-bottom: 12px;
+    min-width: 0;
+  }
+  input:focus, select:focus, textarea:focus{
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .field-row{ display:flex; gap: 10px; flex-wrap: wrap; }
+  .field-row > div{ flex: 1 1 130px; min-width: 130px; }
+
+  button{
+    font-family: var(--sans);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 13px;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: transform 0.05s ease, opacity 0.15s ease;
+  }
+  button:active{ transform: scale(0.98); }
+  .btn-primary{ background: var(--accent); color: var(--navy); width: 100%; }
+  .btn-primary:hover{ background: var(--accent-deep); color: #fff; }
+  .btn-ghost{ background: transparent; color: var(--panel-ink); border: 1px solid var(--panel-line); }
+  .btn-danger-outline{ background: transparent; color: var(--danger-deep); border: 1px solid var(--danger-deep); padding: 7px 10px; font-size: 10px; flex-shrink:0;}
+  .btn-stop{ background: var(--danger); color: #fff; width: 100%; }
+  .btn-small{ padding: 8px 10px; font-size: 11px; }
+
+  .entry-row{
+    display:flex; justify-content: space-between; align-items:center;
+    padding: 10px 0; border-bottom: 1px solid var(--panel-line);
+    font-size: 14px; gap: 10px;
+  }
+  .entry-row:last-child{ border-bottom: none; }
+  .entry-main{ font-weight: 600; min-width:0; overflow:hidden; text-overflow:ellipsis; color: var(--panel-ink); }
+  .entry-sub{ font-size: 12px; color: var(--panel-ink-soft); font-family: var(--mono); }
+  .entry-value{ font-family: var(--mono); font-weight:700; flex-shrink:0; color: var(--panel-ink); }
+  .entry-actions{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+
+  .empty{
+    text-align: center; color: var(--panel-ink-soft); font-size: 13px; padding: 18px 6px;
+    border: 1px dashed var(--panel-line); border-radius: 12px;
+  }
+
+  .section{ display:none; }
+  .section.active{ display:block; animation: fadein 0.18s ease; }
+  @keyframes fadein{ from{ opacity:0; transform: translateY(4px);} to{opacity:1; transform:none;} }
+
+  .chart-wrap{ width:100%; overflow-x:auto; }
+  svg.chart{ display:block; }
+
+  .search-input{ margin-bottom: 10px; }
+
+  .menu-toggle-btn{
+    width:100%; background: #fff; color: var(--panel-ink); border: 1px solid var(--panel-line);
+    display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;
+  }
+  .menu-panel{ display:none; }
+  .menu-panel.open{ display:block; }
+  .menu-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 10px 8px; border-bottom: 1px solid var(--panel-line); cursor:pointer; font-size: 14px; color: var(--panel-ink);
+  }
+  .menu-item:last-child{ border-bottom:none; }
+  .menu-item:active{ background: var(--panel); }
+  .menu-item .kcal{ font-family: var(--mono); color: var(--accent-deep); font-weight:700; flex-shrink:0; font-size:12px; text-align:right; }
+
+  .walk-timer{ text-align:center; padding: 14px 0 8px; }
+  .walk-timer .big{ font-family: var(--mono); font-size: 38px; font-weight: 800; color: var(--panel-ink); }
+  .walk-timer .sub-stats{
+    display:flex; justify-content:center; gap: 16px; margin-top: 8px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 12px; color: var(--panel-ink-soft);
+  }
+
+  .thumb-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .thumb-row img{ width:60px; height:60px; object-fit:cover; border-radius:10px; border:1px solid var(--panel-line); }
+
+  .leaflet-map{ height: 180px; border-radius: 12px; border:1px solid var(--panel-line); margin-top:8px; z-index:1; }
+
+  .modal-backdrop{
+    position: fixed; inset:0; background: rgba(6,10,16,0.6);
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index: 40;
+  }
+  .modal{
+    background: var(--panel); border-radius: 18px 18px 0 0;
+    padding: 20px; padding-bottom: calc(20px + var(--safe-bottom));
+    width: 100%; max-width: 640px;
+    max-height: 85vh; overflow-y:auto;
+  }
+  .modal-title{ font-weight: 800; text-transform:uppercase; letter-spacing:0.05em; font-size: 15px; margin-bottom: 14px; color: var(--panel-ink); }
+  .hidden{ display:none !important; }
+
+  .small-note{ font-size:11px; color: var(--panel-ink-soft); margin-top:-6px; margin-bottom:12px; }
+  .small-note-standalone{ font-size:11px; color: var(--panel-ink-soft); margin-top:10px; margin-bottom:0; text-align:center; }
+
+  details.manual-details{ border: 1px dashed var(--panel-line); border-radius: 12px; padding: 10px 12px; }
+  details.manual-details summary{
+    cursor:pointer; font-size: 12px; text-transform:uppercase; letter-spacing:0.06em; color: var(--panel-ink-soft); font-weight:700;
+    padding: 4px 0;
+  }
+  details.manual-details[open] summary{ margin-bottom: 8px; }
+
+  /* Calendar */
+  .cal-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .cal-header button{ background: #fff; color: var(--panel-ink); border:1px solid var(--panel-line); padding: 8px 12px; }
+  .cal-month-label{ font-family: var(--mono); font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:0.05em; color: var(--panel-ink); }
+  .cal-grid{ display:grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow{ text-align:center; font-size:10px; color:var(--panel-ink-soft); text-transform:uppercase; padding-bottom:4px; }
+  .cal-day{
+    aspect-ratio: 1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius: 10px; background: #fff; border:1px solid var(--panel-line);
+    font-family: var(--mono); font-size: 12px; cursor:pointer; position:relative; color: var(--panel-ink);
+  }
+  .cal-day.empty-cell{ visibility:hidden; }
+  .cal-day.today{ border-color: var(--accent); border-width:2px; }
+  .cal-day .cal-dot{ width:5px; height:5px; border-radius:50%; background: var(--amber); margin-top:2px; }
+  .cal-day:active{ background: var(--accent); color:#fff; }
+
+  .backup-row{ display:flex; gap:10px; }
+  .backup-row button{ flex:1; }
+  .mileage-pill.active{ background: var(--accent); color: var(--navy); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="brand-head">
+  <div>
+    <div class="brand-row">
+      <span class="brand-blaze"></span>
+      <h1 class="brand-title">Welcome Ragnar</h1>
+    </div>
+    <div class="brand-sub" id="today-label">—</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <div class="streak-badge" id="streak-badge">
+      <svg viewBox="0 0 24 24" fill="var(--amber)" stroke="none"><path d="M12 2c1 3-3 4-3 8a3 3 0 006 0c1.5 1.5 2 3.5 2 5a5 5 0 01-10 0c0-4 3-7 3-9 0-1.5.5-3 2-4z"></path></svg>
+      <span id="streak-count">0</span>
+    </div>
+    <button class="settings-gear" id="settings-gear-btn" onclick="goTab('settings')" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+  </div>
+</div>
+
+<nav class="tabbar-top">
+  <button class="tab-btn active" data-tab="dashboard" onclick="goTab('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"></path><path d="M9 22V12h6v10"></path></svg>
+    Dash
+  </button>
+  <button class="tab-btn" data-tab="weight" onclick="goTab('weight')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"></rect><circle cx="12" cy="14" r="2.2"></circle><path d="M9 8V6a3 3 0 016 0v2"></path></svg>
+    Weight
+  </button>
+  <button class="tab-btn" data-tab="walks" onclick="goTab('walks')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11a7 7 0 10-14 0c0 4.5 7 11 7 11z"></path><circle cx="12" cy="10" r="2.2"></circle></svg>
+    Walks
+  </button>
+  <button class="tab-btn" data-tab="calories" onclick="goTab('calories')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"></path><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"></path><line x1="6" y1="2" x2="6" y2="4"></line><line x1="10" y1="2" x2="10" y2="4"></line><line x1="14" y1="2" x2="14" y2="4"></line></svg>
+    Food
+  </button>
+  <button class="tab-btn" data-tab="steps" onclick="goTab('steps')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+    Steps
+  </button>
+  <button class="tab-btn" data-tab="calendar" onclick="goTab('calendar')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    Cal
+  </button>
+  <button class="tab-btn" data-tab="notes" onclick="goTab('notes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V4a1 1 0 00-1-1H6.5A2.5 2.5 0 004 5.5v14z"></path><path d="M4 19.5V22h14a2 2 0 002-2v-3H6.5A2.5 2.5 0 004 19.5z"></path></svg>
+    Notes
+  </button>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section class="section active" id="tab-dashboard">
+    <div class="card">
+      <h2>Today at a glance</h2>
+      <div class="stat-stack">
+        <div class="stat">
+          <div class="stat-label">Calories today</div>
+          <div class="stat-value" id="dash-cals">—<span class="stat-unit">kcal</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Last walk</div>
+          <div class="stat-value" id="dash-walk" style="font-size:15px;">—</div>
+        </div>
+        <div class="stat stat-range">
+          <div class="stat-range-head">
+            <span class="stat-label">Distance walked</span>
+            <select id="dash-mileage-range" onchange="renderDashMileage()">
+              <option value="day">Day</option>
+              <option value="week" selected>Week</option>
+              <option value="month">Month</option>
+              <option value="year">Year</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="stat-value" id="dash-mileage-value">0.0<span class="stat-unit"> mi</span></div>
+          <div class="stat-range-custom hidden" id="dash-mileage-custom">
+            <div class="field-row">
+              <div><input type="date" id="dash-mileage-from"></div>
+              <div><input type="date" id="dash-mileage-to"></div>
+            </div>
+            <button class="btn-ghost btn-small" style="width:100%" onclick="renderDashMileage()">Update</button>
+          </div>
+        </div>
+        <div class="stat stat-range">
+          <div class="stat-range-head">
+            <span class="stat-label">Weight change</span>
+            <select id="dash-weight-range" onchange="renderDashWeightChange()">
+              <option value="day">Day</option>
+              <option value="week" selected>Week</option>
+              <option value="month">Month</option>
+              <option value="year">Year</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="stat-value" id="dash-weight-change">—<span class="stat-unit"> lb</span></div>
+          <div class="stat-range-custom hidden" id="dash-weight-custom">
+            <div class="field-row">
+              <div><input type="date" id="dash-weight-from"></div>
+              <div><input type="date" id="dash-weight-to"></div>
+            </div>
+            <button class="btn-ghost btn-small" style="width:100%" onclick="renderDashWeightChange()">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quick add</h2>
+      <div class="field-row">
+        <div><button class="btn-ghost" style="width:100%" onclick="goTab('weight')">+ Weight</button></div>
+        <div><button class="btn-ghost" style="width:100%" onclick="goTab('steps')">+ Steps</button></div>
+      </div>
+      <div class="field-row">
+        <div><button class="btn-ghost" style="width:100%" onclick="goTab('walks')">+ Walk</button></div>
+        <div><button class="btn-ghost" style="width:100%" onclick="goTab('calories')">+ Food</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WEIGHT -->
+  <section class="section" id="tab-weight">
+    <div class="card">
+      <h2>Log weight</h2>
+      <div class="field-row">
+        <div>
+          <label>Weight (lb)</label>
+          <input type="number" step="0.1" id="weight-input" placeholder="185.4" />
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="weight-date" />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="addWeight()">Save weight</button>
+    </div>
+
+    <div class="card">
+      <h2>Trend</h2>
+      <div class="chart-wrap"><svg class="chart" id="weight-chart" height="150"></svg></div>
+      <div class="empty hidden" id="weight-chart-empty">No entries yet — log your first weight above.</div>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <div id="weight-list"></div>
+    </div>
+  </section>
+
+  <!-- WALKS -->
+  <section class="section" id="tab-walks">
+    <div class="card" id="walk-live-card">
+      <h2>Live walk</h2>
+      <div class="walk-timer">
+        <div class="big" id="walk-clock">00:00</div>
+        <div class="sub-stats">
+          <span id="walk-dist">0.00 mi</span>
+          <span id="walk-pace">— /mi</span>
+        </div>
+      </div>
+      <button class="btn-primary" id="walk-start-btn" onclick="startWalk()">Start walk</button>
+      <button class="btn-stop hidden" id="walk-stop-btn" onclick="stopWalk()">Stop &amp; save</button>
+      <div class="small-note-standalone" id="walk-gps-note">Uses your phone's GPS — allow location access when prompted.</div>
+    </div>
+
+    <div class="card">
+      <details class="manual-details" id="manual-walk-details">
+        <summary>Log a walk manually</summary>
+        <div class="field-row">
+          <div>
+            <label>Walk name</label>
+            <input type="text" id="mwalk-name" placeholder="Riverside loop" />
+          </div>
+          <div>
+            <label>Date</label>
+            <input type="date" id="mwalk-date" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label>Duration (min)</label>
+            <input type="number" id="mwalk-duration" placeholder="32" />
+          </div>
+          <div>
+            <label>Distance (mi)</label>
+            <input type="number" step="0.01" id="mwalk-distance" placeholder="2.1" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div>
+            <label>Temp (°F)</label>
+            <input type="number" id="mwalk-temp" placeholder="68" />
+          </div>
+          <div>
+            <label>Location / notes</label>
+            <input type="text" id="mwalk-location" placeholder="Riverside trail" />
+          </div>
+        </div>
+        <button class="btn-ghost" style="width:100%" onclick="addManualWalk()">Save manual walk</button>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Mileage</h2>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div style="flex:1 1 auto;"><button class="btn-ghost mileage-pill" id="mi-pill-week" style="width:100%" onclick="setMileageRange('week')">This week</button></div>
+        <div style="flex:1 1 auto;"><button class="btn-ghost mileage-pill" id="mi-pill-month" style="width:100%" onclick="setMileageRange('month')">This month</button></div>
+      </div>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div style="flex:1 1 auto;"><button class="btn-ghost mileage-pill" id="mi-pill-all" style="width:100%" onclick="setMileageRange('all')">All time</button></div>
+        <div style="flex:1 1 auto;"><button class="btn-ghost mileage-pill" id="mi-pill-custom" style="width:100%" onclick="setMileageRange('custom')">Custom range</button></div>
+      </div>
+      <div id="mileage-custom-inputs" class="hidden">
+        <div class="field-row">
+          <div><label>From</label><input type="date" id="mileage-from"></div>
+          <div><label>To</label><input type="date" id="mileage-to"></div>
+        </div>
+        <button class="btn-ghost" style="width:100%; margin-bottom:12px;" onclick="renderMileage()">Calculate</button>
+      </div>
+      <div class="stat">
+        <div class="stat-label" id="mileage-label">This week</div>
+        <div class="stat-value" id="mileage-value">0.0<span class="stat-unit"> mi</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Walk history</h2>
+      <input type="text" class="search-input" id="walk-search" placeholder="Search by name or distance (e.g. 2.1)" oninput="renderWalks()" />
+      <div id="walk-list"></div>
+    </div>
+  </section>
+
+  <!-- CALORIES -->
+  <section class="section" id="tab-calories">
+    <div class="card">
+      <h2>Today's food log</h2>
+      <div class="stat" style="margin-bottom:12px;">
+        <div class="stat-label">Total today</div>
+        <div class="stat-value" id="cal-total">0<span class="stat-unit">kcal</span></div>
+      </div>
+      <div id="cal-today-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>Menu</h2>
+      <button class="menu-toggle-btn" onclick="toggleMenu()">
+        <span id="menu-toggle-label">Open menu — reuse a food you've logged before</span>
+        <span id="menu-toggle-arrow">▾</span>
+      </button>
+      <div class="menu-panel" id="menu-panel">
+        <input type="text" class="search-input" id="menu-search" placeholder="Search foods..." oninput="renderMenu()" />
+        <div id="menu-list"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Add a food</h2>
+      <div class="field-row">
+        <div>
+          <label>Food name</label>
+          <input type="text" id="custom-food-name" placeholder="Chicken &amp; rice bowl" />
+        </div>
+        <div>
+          <label>Grams</label>
+          <input type="number" id="custom-food-grams" placeholder="220" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div>
+          <label>Calories</label>
+          <input type="number" id="custom-food-cal" placeholder="340" />
+        </div>
+        <div>
+          <label>Protein (g)</label>
+          <input type="number" id="custom-food-protein" placeholder="38" />
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:0;">Add grams too, and this food will scale automatically next time you log it from the Menu with a different amount.</div>
+      <button class="btn-primary" onclick="addCustomFood()">Add to today's log</button>
+    </div>
+
+    <div class="card">
+      <h2>Previous days</h2>
+      <div id="cal-history-list"></div>
+    </div>
+  </section>
+
+  <!-- STEPS -->
+  <section class="section" id="tab-steps">
+    <div class="card">
+      <h2>Log steps</h2>
+      <div class="field-row">
+        <div>
+          <label>Steps</label>
+          <input type="number" id="steps-input" placeholder="8500" />
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="steps-date" />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="addSteps()">Save steps</button>
+    </div>
+
+    <div class="card">
+      <h2>Last 14 days</h2>
+      <div class="chart-wrap"><svg class="chart" id="steps-chart" height="150"></svg></div>
+      <div class="empty hidden" id="steps-chart-empty">No entries yet — log today's steps above.</div>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <div id="steps-list"></div>
+    </div>
+  </section>
+
+  <!-- CALENDAR -->
+  <section class="section" id="tab-calendar">
+    <div class="card">
+      <div class="cal-header">
+        <button onclick="calShiftMonth(-1)">‹ Prev</button>
+        <div class="cal-month-label" id="cal-month-label">—</div>
+        <button onclick="calShiftMonth(1)">Next ›</button>
+      </div>
+      <div class="cal-grid" id="cal-dow-row"></div>
+      <div class="cal-grid" id="cal-grid" style="margin-top:4px;"></div>
+      <div class="small-note" style="text-align:center; margin-top:10px;">Tap any day to see everything logged.</div>
+    </div>
+  </section>
+
+  <!-- NOTES -->
+  <section class="section" id="tab-notes">
+    <div class="card">
+      <h2>Add a note</h2>
+      <label>Date</label>
+      <input type="date" id="note-date" />
+      <label>Note</label>
+      <textarea id="note-text" rows="4" placeholder="Anything worth remembering about today..."></textarea>
+      <button class="btn-primary" onclick="saveNote()">Save note</button>
+    </div>
+
+    <div class="card">
+      <h2>All notes</h2>
+      <div id="notes-list"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="section" id="tab-settings">
+    <div class="card">
+      <h2>Backup</h2>
+      <div class="small-note" style="margin-top:0;">Data only lives on this device. Export a backup now and then, especially before switching phones.</div>
+      <div class="backup-row">
+        <button class="btn-ghost" onclick="exportData()">Export data</button>
+        <button class="btn-ghost" onclick="document.getElementById('import-file-input').click()">Import data</button>
+      </div>
+      <input type="file" id="import-file-input" accept="application/json" class="hidden" onchange="importData(event)" />
+    </div>
+
+    <div class="card">
+      <h2>About</h2>
+      <div class="small-note" style="margin-top:0;">Viking Fitness — a personal tracker for weight, walks, food, and steps. No account needed; everything stays on this device unless you export a backup.</div>
+    </div>
+  </section>
+
+</main>
+
+<div class="modal-backdrop hidden" id="photo-modal-backdrop">
+  <div class="modal">
+    <div class="modal-title">Add photos to this walk</div>
+    <input type="file" id="walk-photo-input" accept="image/*" multiple />
+    <div class="thumb-row" id="walk-photo-preview"></div>
+    <button class="btn-primary" onclick="closePhotoModal()">Done</button>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="finish-walk-modal-backdrop">
+  <div class="modal">
+    <div class="modal-title">Walk details</div>
+    <label>Walk name</label>
+    <input type="text" id="finish-walk-name" placeholder="Riverside loop" />
+    <label>Temperature (°F)</label>
+    <input type="number" id="finish-walk-temp" placeholder="68" />
+    <label>Location / notes</label>
+    <input type="text" id="finish-walk-location" placeholder="Riverside trail" />
+    <button class="btn-primary" onclick="confirmFinishWalk()">Save walk</button>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="day-modal-backdrop">
+  <div class="modal">
+    <div class="modal-title" id="day-modal-title">—</div>
+    <div id="day-modal-body"></div>
+    <button class="btn-ghost" style="width:100%; margin-top:12px;" onclick="closeDayModal()">Close</button>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="menu-grams-modal-backdrop">
+  <div class="modal">
+    <div class="modal-title" id="menu-grams-title">How many grams?</div>
+    <label>Grams eaten</label>
+    <input type="number" id="menu-grams-input" placeholder="220" />
+    <button class="btn-primary" onclick="confirmMenuGrams()">Add to today's log</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ---------- storage helpers ---------- */
+function loadData(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){ return fallback; }
+}
+function saveData(key, value){
+  try{ localStorage.setItem(key, JSON.stringify(value)); }
+  catch(e){ alert("Storage is full — try removing some walk photos to free up space."); }
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){
+  const dt = new Date(d + "T00:00:00");
+  return dt.toLocaleDateString(undefined, { month:"short", day:"numeric" });
+}
+
+/* ---------- tab navigation ---------- */
+function goTab(name){
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("settings-gear-btn").classList.remove("active");
+  document.getElementById("tab-" + name).classList.add("active");
+  const tabBtn = document.querySelector('.tab-btn[data-tab="' + name + '"]');
+  if(tabBtn) tabBtn.classList.add("active");
+  else if(name === "settings") document.getElementById("settings-gear-btn").classList.add("active");
+  refreshAll();
+  window.scrollTo(0,0);
+}
+
+document.getElementById("today-label").textContent =
+  new Date().toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric", year:"numeric" });
+
+/* ================= WEIGHT ================= */
+let weightEntries = loadData("ft_weight", []);
+
+function addWeight(){
+  const val = parseFloat(document.getElementById("weight-input").value);
+  const date = document.getElementById("weight-date").value || todayStr();
+  if(!val || val <= 0){ alert("Enter a valid weight."); return; }
+  weightEntries = weightEntries.filter(e => e.date !== date);
+  weightEntries.push({ id: uid(), date, value: val });
+  weightEntries.sort((a,b) => a.date.localeCompare(b.date));
+  saveData("ft_weight", weightEntries);
+  document.getElementById("weight-input").value = "";
+  renderWeight();
+  renderDashboard();
+}
+function deleteWeight(id){
+  weightEntries = weightEntries.filter(e => e.id !== id);
+  saveData("ft_weight", weightEntries);
+  renderWeight(); renderDashboard();
+}
+function renderWeight(){
+  const list = document.getElementById("weight-list");
+  if(weightEntries.length === 0){
+    list.innerHTML = '<div class="empty">No weight logged yet.</div>';
+  }else{
+    list.innerHTML = weightEntries.slice().reverse().map(e => `
+      <div class="entry-row">
+        <div class="entry-main">${fmtDate(e.date)}</div>
+        <div class="entry-actions">
+          <span class="entry-value">${e.value.toFixed(1)} lb</span>
+          <button class="btn-danger-outline" onclick="deleteWeight('${e.id}')">Remove</button>
+        </div>
+      </div>
+    `).join("");
+  }
+  drawLineChart("weight-chart", "weight-chart-empty", weightEntries.slice(-30).map(e => ({ x: e.date, y: e.value })));
+}
+
+/* ================= STEPS ================= */
+let stepsEntries = loadData("ft_steps", []);
+
+function addSteps(){
+  const val = parseInt(document.getElementById("steps-input").value, 10);
+  const date = document.getElementById("steps-date").value || todayStr();
+  if(!val || val < 0){ alert("Enter a valid step count."); return; }
+  stepsEntries = stepsEntries.filter(e => e.date !== date);
+  stepsEntries.push({ id: uid(), date, value: val });
+  stepsEntries.sort((a,b) => a.date.localeCompare(b.date));
+  saveData("ft_steps", stepsEntries);
+  document.getElementById("steps-input").value = "";
+  renderSteps();
+  renderDashboard();
+}
+function deleteSteps(id){
+  stepsEntries = stepsEntries.filter(e => e.id !== id);
+  saveData("ft_steps", stepsEntries);
+  renderSteps(); renderDashboard();
+}
+function renderSteps(){
+  const list = document.getElementById("steps-list");
+  if(stepsEntries.length === 0){
+    list.innerHTML = '<div class="empty">No steps logged yet.</div>';
+  }else{
+    list.innerHTML = stepsEntries.slice().reverse().map(e => `
+      <div class="entry-row">
+        <div class="entry-main">${fmtDate(e.date)}</div>
+        <div class="entry-actions">
+          <span class="entry-value">${e.value.toLocaleString()}</span>
+          <button class="btn-danger-outline" onclick="deleteSteps('${e.id}')">Remove</button>
+        </div>
+      </div>
+    `).join("");
+  }
+  drawBarChart("steps-chart", "steps-chart-empty", stepsEntries.slice(-14).map(e => ({ x: e.date, y: e.value })));
+}
+
+/* ================= CALORIES / FOOD (with macros) ================= */
+let legacyPresets = loadData("ft_cal_presets", []);
+let foodLog = loadData("ft_cal_log", []); // {id, date, name, grams?, cal, protein?}
+let foodDefs = loadData("ft_food_defs", {}); // key: lowercase name -> {name, calPerGram, proteinPerGram, lastGrams}
+let menuOpen = false;
+let pendingMenuFood = null;
+
+function toggleMenu(){
+  menuOpen = !menuOpen;
+  document.getElementById("menu-panel").classList.toggle("open", menuOpen);
+  document.getElementById("menu-toggle-arrow").textContent = menuOpen ? "▴" : "▾";
+  document.getElementById("menu-toggle-label").textContent = menuOpen ? "Close menu" : "Open menu — reuse a food you've logged before";
+  if(menuOpen) renderMenu();
+}
+
+function getMenuItems(){
+  const map = new Map();
+  legacyPresets.forEach(p => map.set(p.name.toLowerCase(), { name: p.name, cal: p.cal, scalable: false }));
+  Object.values(foodDefs).forEach(d => {
+    map.set(d.name.toLowerCase(), {
+      name: d.name,
+      cal: Math.round(d.calPerGram * d.lastGrams),
+      grams: d.lastGrams,
+      scalable: true
+    });
+  });
+  return Array.from(map.values()).sort((a,b) => a.name.localeCompare(b.name));
+}
+
+function renderMenu(){
+  const query = (document.getElementById("menu-search").value || "").toLowerCase().trim();
+  const items = getMenuItems().filter(i => !query || i.name.toLowerCase().includes(query));
+  const list = document.getElementById("menu-list");
+  list.innerHTML = items.length === 0
+    ? '<div class="empty">Nothing logged yet — add a food below and it will show up here next time.</div>'
+    : items.map(i => `
+      <div class="menu-item" onclick="onMenuItemClick('${i.name.replace(/'/g, "\\'")}')">
+        <span>${i.name}${i.grams ? ` <span style="color:var(--panel-ink-soft); font-size:12px;">(${i.grams}g last time)</span>` : ""}</span>
+        <span class="kcal">${i.cal} kcal</span>
+      </div>
+    `).join("");
+}
+
+function onMenuItemClick(name){
+  const def = foodDefs[name.toLowerCase()];
+  if(def){
+    pendingMenuFood = name;
+    document.getElementById("menu-grams-title").textContent = name + " — how many grams?";
+    document.getElementById("menu-grams-input").value = def.lastGrams;
+    document.getElementById("menu-grams-modal-backdrop").classList.remove("hidden");
+  }else{
+    const legacy = legacyPresets.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if(legacy){
+      foodLog.push({ id: uid(), date: todayStr(), name: legacy.name, cal: legacy.cal });
+      saveData("ft_cal_log", foodLog);
+      renderCalories();
+      renderDashboard();
+    }
+  }
+}
+
+function confirmMenuGrams(){
+  const grams = parseFloat(document.getElementById("menu-grams-input").value);
+  if(!grams || grams <= 0){ alert("Enter a valid gram amount."); return; }
+  const def = foodDefs[pendingMenuFood.toLowerCase()];
+  if(!def) return;
+  const cal = Math.round(def.calPerGram * grams);
+  const protein = def.proteinPerGram != null ? Math.round(def.proteinPerGram * grams * 10) / 10 : null;
+
+  foodLog.push({ id: uid(), date: todayStr(), name: def.name, grams, cal, protein });
+  def.lastGrams = grams;
+  foodDefs[pendingMenuFood.toLowerCase()] = def;
+  saveData("ft_cal_log", foodLog);
+  saveData("ft_food_defs", foodDefs);
+
+  document.getElementById("menu-grams-modal-backdrop").classList.add("hidden");
+  pendingMenuFood = null;
+  renderCalories();
+  renderDashboard();
+}
+
+function addCustomFood(){
+  const name = document.getElementById("custom-food-name").value.trim();
+  const grams = parseFloat(document.getElementById("custom-food-grams").value);
+  const cal = parseInt(document.getElementById("custom-food-cal").value, 10);
+  const protein = parseFloat(document.getElementById("custom-food-protein").value);
+  if(!name || !cal){ alert("Enter at least a food name and calories."); return; }
+
+  const entry = { id: uid(), date: todayStr(), name, cal };
+  if(grams){ entry.grams = grams; }
+  if(!isNaN(protein)){ entry.protein = protein; }
+  foodLog.push(entry);
+  saveData("ft_cal_log", foodLog);
+
+  if(grams){
+    foodDefs[name.toLowerCase()] = {
+      name,
+      calPerGram: cal / grams,
+      proteinPerGram: !isNaN(protein) ? protein / grams : null,
+      lastGrams: grams
+    };
+    saveData("ft_food_defs", foodDefs);
+  }
+
+  document.getElementById("custom-food-name").value = "";
+  document.getElementById("custom-food-grams").value = "";
+  document.getElementById("custom-food-cal").value = "";
+  document.getElementById("custom-food-protein").value = "";
+  renderCalories();
+  renderDashboard();
+}
+
+function deleteFoodEntry(id){
+  foodLog = foodLog.filter(f => f.id !== id);
+  saveData("ft_cal_log", foodLog);
+  renderCalories();
+  renderDashboard();
+}
+
+function foodEntryLabel(f){
+  let parts = [];
+  if(f.grams) parts.push(f.grams + "g");
+  parts.push(f.cal + " kcal");
+  if(f.protein != null) parts.push(f.protein + "g protein");
+  return parts.join(" · ");
+}
+
+function renderCalories(){
+  const today = todayStr();
+  const todays = foodLog.filter(f => f.date === today);
+  const total = todays.reduce((s,f) => s + f.cal, 0);
+  document.getElementById("cal-total").innerHTML = total.toLocaleString() + '<span class="stat-unit">kcal</span>';
+
+  const todayList = document.getElementById("cal-today-list");
+  todayList.innerHTML = todays.length === 0
+    ? '<div class="empty">Nothing logged today yet.</div>'
+    : todays.slice().reverse().map(f => `
+      <div class="entry-row">
+        <div class="entry-main">${f.name}</div>
+        <div class="entry-actions">
+          <span class="entry-sub">${foodEntryLabel(f)}</span>
+          <button class="btn-danger-outline" onclick="deleteFoodEntry('${f.id}')">Remove</button>
+        </div>
+      </div>
+    `).join("");
+
+  const priorDates = [...new Set(foodLog.filter(f => f.date !== today).map(f => f.date))].sort().reverse().slice(0, 14);
+  const histList = document.getElementById("cal-history-list");
+  histList.innerHTML = priorDates.length === 0
+    ? '<div class="empty">No previous days yet.</div>'
+    : priorDates.map(d => {
+        const dayTotal = foodLog.filter(f => f.date === d).reduce((s,f) => s + f.cal, 0);
+        return `<div class="entry-row"><div class="entry-main">${fmtDate(d)}</div><span class="entry-value">${dayTotal.toLocaleString()} kcal</span></div>`;
+      }).join("");
+
+  if(menuOpen) renderMenu();
+}
+
+/* ================= WALKS ================= */
+let walks = loadData("ft_walks", []);
+let walkState = null;
+let pendingPhotos = [];
+let pendingWalkForPhotos = null;
+let pendingFinishWalk = null;
+let leafletMaps = {};
+
+function startWalk(){
+  if(!navigator.geolocation){
+    alert("Geolocation isn't available on this device/browser.");
+    return;
+  }
+  walkState = { startTime: Date.now(), points: [], distanceMeters: 0 };
+  document.getElementById("walk-start-btn").classList.add("hidden");
+  document.getElementById("walk-stop-btn").classList.remove("hidden");
+
+  walkState.timerHandle = setInterval(updateWalkClock, 1000);
+  walkState.watchId = navigator.geolocation.watchPosition(onWalkPosition, onWalkGeoError, {
+    enableHighAccuracy: true, maximumAge: 2000, timeout: 10000
+  });
+}
+
+function onWalkGeoError(err){
+  document.getElementById("walk-gps-note").textContent =
+    "Location unavailable (" + err.message + ") — you can still log this walk manually below.";
+}
+
+function haversineMeters(a, b){
+  const R = 6371000;
+  const dLat = (b.lat - a.lat) * Math.PI/180;
+  const dLng = (b.lng - a.lng) * Math.PI/180;
+  const lat1 = a.lat * Math.PI/180, lat2 = b.lat * Math.PI/180;
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function onWalkPosition(pos){
+  if(!walkState) return;
+  const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude, t: Date.now() };
+  const pts = walkState.points;
+  if(pts.length > 0){
+    const d = haversineMeters(pts[pts.length-1], pt);
+    if(d > 1) walkState.distanceMeters += d;
+  }
+  pts.push(pt);
+  updateWalkStats();
+}
+
+function updateWalkClock(){
+  if(!walkState) return;
+  const secs = Math.floor((Date.now() - walkState.startTime)/1000);
+  const m = String(Math.floor(secs/60)).padStart(2,"0");
+  const s = String(secs%60).padStart(2,"0");
+  document.getElementById("walk-clock").textContent = m + ":" + s;
+  updateWalkStats();
+}
+
+function updateWalkStats(){
+  if(!walkState) return;
+  const miles = walkState.distanceMeters / 1609.34;
+  document.getElementById("walk-dist").textContent = miles.toFixed(2) + " mi";
+  const mins = (Date.now() - walkState.startTime)/60000;
+  if(miles > 0.02){
+    const pace = mins / miles;
+    const pm = Math.floor(pace), ps = Math.round((pace - pm)*60);
+    document.getElementById("walk-pace").textContent = pm + ":" + String(ps).padStart(2,"0") + " /mi";
+  }
+}
+
+function stopWalk(){
+  if(!walkState) return;
+  clearInterval(walkState.timerHandle);
+  if(walkState.watchId) navigator.geolocation.clearWatch(walkState.watchId);
+
+  const durationMin = Math.max(1, Math.round((Date.now() - walkState.startTime)/60000));
+  const miles = walkState.distanceMeters / 1609.34;
+
+  pendingFinishWalk = {
+    id: uid(),
+    date: todayStr(),
+    durationMin,
+    distanceMi: Math.round(miles*100)/100,
+    path: walkState.points.map(p => ({ lat: p.lat, lng: p.lng })),
+    photos: [],
+    manual: false
+  };
+
+  walkState = null;
+  document.getElementById("walk-start-btn").classList.remove("hidden");
+  document.getElementById("walk-stop-btn").classList.add("hidden");
+  document.getElementById("walk-clock").textContent = "00:00";
+  document.getElementById("walk-dist").textContent = "0.00 mi";
+  document.getElementById("walk-pace").textContent = "— /mi";
+
+  document.getElementById("finish-walk-name").value = "";
+  document.getElementById("finish-walk-temp").value = "";
+  document.getElementById("finish-walk-location").value = "";
+  document.getElementById("finish-walk-modal-backdrop").classList.remove("hidden");
+}
+
+function confirmFinishWalk(){
+  if(!pendingFinishWalk) return;
+  const name = document.getElementById("finish-walk-name").value.trim() || "Walk";
+  const temp = document.getElementById("finish-walk-temp").value;
+  const location = document.getElementById("finish-walk-location").value.trim();
+
+  pendingFinishWalk.name = name;
+  pendingFinishWalk.temp = temp ? parseFloat(temp) : null;
+  pendingFinishWalk.location = location;
+
+  walks.push(pendingFinishWalk);
+  saveData("ft_walks", walks);
+  const savedId = pendingFinishWalk.id;
+  pendingFinishWalk = null;
+
+  document.getElementById("finish-walk-modal-backdrop").classList.add("hidden");
+  renderWalks();
+  renderDashboard();
+  openPhotoModal(savedId);
+}
+
+function addManualWalk(){
+  const name = document.getElementById("mwalk-name").value.trim() || "Walk";
+  const date = document.getElementById("mwalk-date").value || todayStr();
+  const durationMin = parseInt(document.getElementById("mwalk-duration").value, 10);
+  const distanceMi = parseFloat(document.getElementById("mwalk-distance").value);
+  const temp = document.getElementById("mwalk-temp").value;
+  const location = document.getElementById("mwalk-location").value.trim();
+  if(!durationMin || !distanceMi){ alert("Enter at least duration and distance."); return; }
+
+  const walk = {
+    id: uid(), name, date, durationMin, distanceMi,
+    temp: temp ? parseFloat(temp) : null,
+    location, path: [], photos: [], manual: true
+  };
+  walks.push(walk);
+  saveData("ft_walks", walks);
+
+  ["mwalk-name","mwalk-duration","mwalk-distance","mwalk-temp","mwalk-location"].forEach(id => document.getElementById(id).value = "");
+  renderWalks();
+  renderDashboard();
+}
+
+function deleteWalk(id){
+  walks = walks.filter(w => w.id !== id);
+  saveData("ft_walks", walks);
+  renderWalks();
+  renderDashboard();
+}
+
+function repeatWalk(id){
+  const w = walks.find(x => x.id === id);
+  if(!w) return;
+  document.getElementById("manual-walk-details").open = true;
+  document.getElementById("mwalk-name").value = w.name || "";
+  document.getElementById("mwalk-distance").value = w.distanceMi;
+  document.getElementById("mwalk-location").value = w.location || "";
+  document.getElementById("mwalk-duration").value = w.durationMin;
+  document.getElementById("mwalk-date").value = todayStr();
+  document.getElementById("manual-walk-details").scrollIntoView({ behavior:"smooth", block:"center" });
+}
+
+function openPhotoModal(walkId){
+  pendingWalkForPhotos = walkId;
+  pendingPhotos = [];
+  document.getElementById("walk-photo-preview").innerHTML = "";
+  document.getElementById("walk-photo-input").value = "";
+  document.getElementById("photo-modal-backdrop").classList.remove("hidden");
+}
+function closePhotoModal(){
+  const walk = walks.find(w => w.id === pendingWalkForPhotos);
+  if(walk && pendingPhotos.length){
+    walk.photos = (walk.photos || []).concat(pendingPhotos);
+    saveData("ft_walks", walks);
+    renderWalks();
+  }
+  document.getElementById("photo-modal-backdrop").classList.add("hidden");
+  pendingWalkForPhotos = null;
+  pendingPhotos = [];
+}
+document.getElementById("walk-photo-input").addEventListener("change", function(e){
+  const files = Array.from(e.target.files || []).slice(0, 6);
+  const preview = document.getElementById("walk-photo-preview");
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      const img = new Image();
+      img.onload = function(){
+        const canvas = document.createElement("canvas");
+        const maxDim = 480;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        pendingPhotos.push(dataUrl);
+        const thumb = document.createElement("img");
+        thumb.src = dataUrl;
+        preview.appendChild(thumb);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+});
+function addPhotosToWalk(walkId){ openPhotoModal(walkId); }
+
+function renderPathSvg(){ /* replaced by leaflet maps */ }
+
+function renderWalks(){
+  const list = document.getElementById("walk-list");
+  Object.values(leafletMaps).forEach(m => { try{ m.remove(); }catch(e){} });
+  leafletMaps = {};
+
+  const query = (document.getElementById("walk-search").value || "").toLowerCase().trim();
+  let filtered = walks.slice().reverse();
+  if(query){
+    filtered = filtered.filter(w =>
+      (w.name || "").toLowerCase().includes(query) ||
+      w.distanceMi.toFixed(2).includes(query) ||
+      (w.location || "").toLowerCase().includes(query)
+    );
+  }
+
+  if(walks.length === 0){
+    list.innerHTML = '<div class="empty">No walks logged yet.</div>';
+    return;
+  }
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="empty">No walks match that search.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(w => `
+    <div class="entry-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+      <div style="display:flex; justify-content:space-between; gap:8px;">
+        <div class="entry-main">${w.name || "Walk"} — ${fmtDate(w.date)}${w.location ? " · " + w.location : ""}</div>
+        <button class="btn-danger-outline" onclick="deleteWalk('${w.id}')">Remove</button>
+      </div>
+      <div class="entry-sub">
+        ${w.durationMin} min · ${w.distanceMi.toFixed(2)} mi
+        ${w.distanceMi > 0 ? "· " + (w.durationMin/w.distanceMi).toFixed(1) + " min/mi" : ""}
+        ${w.temp != null ? "· " + w.temp + "°F" : ""}
+      </div>
+      ${w.path && w.path.length > 1 ? `<div class="leaflet-map" id="map-${w.id}"></div>` : ""}
+      <div class="thumb-row">
+        ${(w.photos||[]).map(src => `<img src="${src}" />`).join("")}
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-ghost btn-small" style="flex:1" onclick="addPhotosToWalk('${w.id}')">+ Photos</button>
+        <button class="btn-ghost btn-small" style="flex:1" onclick="repeatWalk('${w.id}')">↻ Repeat this walk</button>
+      </div>
+    </div>
+  `).join("");
+
+  filtered.forEach(w => {
+    if(w.path && w.path.length > 1){
+      const el = document.getElementById("map-" + w.id);
+      if(!el || typeof L === "undefined") return;
+      const map = L.map(el, { zoomControl: false, attributionControl: true }).setView([w.path[0].lat, w.path[0].lng], 15);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      const latlngs = w.path.map(p => [p.lat, p.lng]);
+      const line = L.polyline(latlngs, { color: "#33C7E8", weight: 4 }).addTo(map);
+      L.circleMarker(latlngs[0], { radius:5, color:"#34D399", fillColor:"#34D399", fillOpacity:1 }).addTo(map);
+      L.circleMarker(latlngs[latlngs.length-1], { radius:5, color:"#FF6B6B", fillColor:"#FF6B6B", fillOpacity:1 }).addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [16,16] });
+      leafletMaps[w.id] = map;
+    }
+  });
+}
+
+/* ================= CHARTS ================= */
+function smoothPath(points){
+  if(points.length < 2) return "";
+  if(points.length === 2) return `M${points[0].x},${points[0].y} L${points[1].x},${points[1].y}`;
+  let d = `M${points[0].x},${points[0].y}`;
+  for(let i=0; i<points.length-1; i++){
+    const p0 = points[i-1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i+1];
+    const p3 = points[i+2] || p2;
+    const cp1x = p1.x + (p2.x - p0.x)/6;
+    const cp1y = p1.y + (p2.y - p0.y)/6;
+    const cp2x = p2.x - (p3.x - p1.x)/6;
+    const cp2y = p2.y - (p3.y - p1.y)/6;
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+function drawLineChart(svgId, emptyId, data){
+  const svg = document.getElementById(svgId);
+  const emptyEl = document.getElementById(emptyId);
+  if(!data || data.length === 0){
+    svg.innerHTML = ""; emptyEl.classList.remove("hidden"); return;
+  }
+  emptyEl.classList.add("hidden");
+  const w = Math.max(320, data.length * 44), h = 160, pad = 26;
+  svg.setAttribute("width", w); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  const ys = data.map(d => d.y);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanY = (maxY - minY) || 1;
+  const pts = data.map((d,i) => {
+    const x = pad + (i/(Math.max(data.length-1,1))) * (w - pad*2);
+    const y = h - pad - ((d.y - minY)/spanY) * (h - pad*2 - 14);
+    return { x, y, label: d.x, val: d.y };
+  });
+  const curve = smoothPath(pts);
+  const area = curve + ` L${pts[pts.length-1].x.toFixed(1)},${h-pad} L${pts[0].x.toFixed(1)},${h-pad} Z`;
+  const lastPt = pts[pts.length-1];
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="weightFade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#33C7E8" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#33C7E8" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="weightStroke" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#33C7E8"/>
+        <stop offset="100%" stop-color="#FFB454"/>
+      </linearGradient>
+      <filter id="chartGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    <path d="${area}" fill="url(#weightFade)"/>
+    <path d="${curve}" fill="none" stroke="url(#weightStroke)" stroke-width="3" stroke-linecap="round" filter="url(#chartGlow)"/>
+    ${pts.slice(0,-1).map(p => `
+      <circle cx="${p.x}" cy="${p.y}" r="5" fill="#fff" stroke="#FFB454" stroke-width="2"/>
+    `).join("")}
+    <circle cx="${lastPt.x}" cy="${lastPt.y}" r="6.5" fill="#fff" stroke="#FF6B6B" stroke-width="2.5">
+      <animate attributeName="r" values="6.5;9;6.5" dur="1.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.7;1" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    ${pts.map(p => `<text x="${p.x}" y="${h-6}" font-size="9" fill="#8B96A5" text-anchor="middle" font-family="ui-monospace">${fmtDate(p.label)}</text>`).join("")}
+  `;
+}
+function drawBarChart(svgId, emptyId, data){
+  const svg = document.getElementById(svgId);
+  const emptyEl = document.getElementById(emptyId);
+  if(!data || data.length === 0){
+    svg.innerHTML = ""; emptyEl.classList.remove("hidden"); return;
+  }
+  emptyEl.classList.add("hidden");
+  const w = Math.max(320, data.length * 34), h = 150, pad = 20, barW = 18;
+  svg.setAttribute("width", w); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  const maxY = Math.max(...data.map(d => d.y), 1);
+  const defs = `<defs><linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#FFB454"/><stop offset="100%" stop-color="#33C7E8"/>
+  </linearGradient></defs>`;
+  const bars = data.map((d,i) => {
+    const x = pad + i * ((w - pad*2)/data.length);
+    const trackH = h - pad*2;
+    const barH = ((d.y/maxY) * trackH);
+    const y = h - pad - barH;
+    return `<rect x="${x}" y="${pad}" width="${barW}" height="${trackH}" rx="6" fill="#E1E6ED"/>
+            <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(barH,4)}" rx="6" fill="url(#barGrad)"/>
+            <text x="${x + barW/2}" y="${h-4}" font-size="9" fill="#8B96A5" text-anchor="middle" font-family="ui-monospace">${fmtDate(d.x)}</text>`;
+  }).join("");
+  svg.innerHTML = defs + bars;
+}
+
+/* ================= MILEAGE ================= */
+let mileageRange = "week";
+
+function setMileageRange(range){
+  mileageRange = range;
+  document.querySelectorAll(".mileage-pill").forEach(b => b.classList.remove("active"));
+  document.getElementById("mi-pill-" + range).classList.add("active");
+  document.getElementById("mileage-custom-inputs").classList.toggle("hidden", range !== "custom");
+  if(range === "custom"){
+    if(!document.getElementById("mileage-from").value){
+      document.getElementById("mileage-from").value = todayStr();
+      document.getElementById("mileage-to").value = todayStr();
+    }
+  }
+  renderMileage();
+}
+
+function renderMileage(){
+  const today = new Date();
+  let fromStr, toStr, label;
+
+  if(mileageRange === "week"){
+    const from = new Date(today); from.setDate(from.getDate() - 6);
+    fromStr = from.toISOString().slice(0,10); toStr = todayStr();
+    label = "This week";
+  }else if(mileageRange === "month"){
+    fromStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-01";
+    toStr = todayStr();
+    label = "This month";
+  }else if(mileageRange === "all"){
+    fromStr = "0000-00-00"; toStr = "9999-99-99";
+    label = "All time";
+  }else{
+    fromStr = document.getElementById("mileage-from").value || "0000-00-00";
+    toStr = document.getElementById("mileage-to").value || "9999-99-99";
+    label = "Custom range";
+  }
+
+  const total = walks.filter(w => w.date >= fromStr && w.date <= toStr)
+                      .reduce((s,w) => s + w.distanceMi, 0);
+  document.getElementById("mileage-label").textContent = label;
+  document.getElementById("mileage-value").innerHTML = total.toFixed(1) + '<span class="stat-unit"> mi</span>';
+}
+
+/* ================= NOTES ================= */
+let notesEntries = loadData("ft_notes", []); // {id, date, text}
+
+function saveNote(){
+  const date = document.getElementById("note-date").value || todayStr();
+  const text = document.getElementById("note-text").value.trim();
+  if(!text){ alert("Write something first."); return; }
+  notesEntries = notesEntries.filter(n => n.date !== date);
+  notesEntries.push({ id: uid(), date, text });
+  notesEntries.sort((a,b) => a.date.localeCompare(b.date));
+  saveData("ft_notes", notesEntries);
+  document.getElementById("note-text").value = "";
+  renderNotes();
+}
+function deleteNote(id){
+  notesEntries = notesEntries.filter(n => n.id !== id);
+  saveData("ft_notes", notesEntries);
+  renderNotes();
+}
+function renderNotes(){
+  const list = document.getElementById("notes-list");
+  if(!list) return;
+  if(notesEntries.length === 0){
+    list.innerHTML = '<div class="empty">No notes yet.</div>';
+    return;
+  }
+  list.innerHTML = notesEntries.slice().reverse().map(n => `
+    <div class="entry-row" style="flex-direction:column; align-items:stretch; gap:6px;">
+      <div style="display:flex; justify-content:space-between; gap:8px;">
+        <div class="entry-main">${fmtDate(n.date)}</div>
+        <button class="btn-danger-outline" onclick="deleteNote('${n.id}')">Remove</button>
+      </div>
+      <div class="entry-sub" style="font-family: var(--sans); font-size:13px; color: var(--panel-ink);">${n.text}</div>
+    </div>
+  `).join("");
+}
+
+/* ================= STREAK ================= */
+function computeStreak(){
+  let d = new Date();
+  let dStr = d.toISOString().slice(0,10);
+  if(!dateHasData(dStr)){
+    d.setDate(d.getDate() - 1);
+  }
+  let count = 0;
+  while(dateHasData(d.toISOString().slice(0,10))){
+    count++;
+    d.setDate(d.getDate() - 1);
+  }
+  return count;
+}
+function renderStreak(){
+  const streak = computeStreak();
+  document.getElementById("streak-count").textContent = streak;
+  document.getElementById("streak-badge").classList.toggle("zero", streak === 0);
+}
+
+/* ================= DASHBOARD ================= */
+function computeRangeBounds(range, fromInputId, toInputId){
+  const today = new Date();
+  if(range === "day"){
+    const from = new Date(today); from.setDate(from.getDate() - 1);
+    return { from: from.toISOString().slice(0,10), to: todayStr() };
+  }
+  if(range === "week"){
+    const from = new Date(today); from.setDate(from.getDate() - 6);
+    return { from: from.toISOString().slice(0,10), to: todayStr() };
+  }
+  if(range === "month"){
+    return { from: today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-01", to: todayStr() };
+  }
+  if(range === "year"){
+    return { from: today.getFullYear() + "-01-01", to: todayStr() };
+  }
+  const fromVal = document.getElementById(fromInputId).value;
+  const toVal = document.getElementById(toInputId).value;
+  return { from: fromVal || "0000-00-00", to: toVal || todayStr() };
+}
+
+function renderDashMileage(){
+  const range = document.getElementById("dash-mileage-range").value;
+  const customEl = document.getElementById("dash-mileage-custom");
+  customEl.classList.toggle("hidden", range !== "custom");
+  if(range === "custom" && !document.getElementById("dash-mileage-from").value){
+    document.getElementById("dash-mileage-from").value = todayStr();
+    document.getElementById("dash-mileage-to").value = todayStr();
+  }
+  const bounds = computeRangeBounds(range, "dash-mileage-from", "dash-mileage-to");
+  const total = walks.filter(w => w.date >= bounds.from && w.date <= bounds.to)
+                      .reduce((s,w) => s + w.distanceMi, 0);
+  document.getElementById("dash-mileage-value").innerHTML = total.toFixed(1) + '<span class="stat-unit"> mi</span>';
+}
+
+function renderDashWeightChange(){
+  const range = document.getElementById("dash-weight-range").value;
+  const customEl = document.getElementById("dash-weight-custom");
+  customEl.classList.toggle("hidden", range !== "custom");
+  if(range === "custom" && !document.getElementById("dash-weight-from").value){
+    document.getElementById("dash-weight-from").value = todayStr();
+    document.getElementById("dash-weight-to").value = todayStr();
+  }
+  const bounds = computeRangeBounds(range, "dash-weight-from", "dash-weight-to");
+  const el = document.getElementById("dash-weight-change");
+
+  if(weightEntries.length < 2){ el.innerHTML = "—"; return; }
+  const sorted = weightEntries.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const latestCandidates = sorted.filter(e => e.date <= bounds.to);
+  const baselineCandidates = sorted.filter(e => e.date <= bounds.from);
+  const latest = latestCandidates.length ? latestCandidates[latestCandidates.length - 1] : null;
+  const baseline = baselineCandidates.length ? baselineCandidates[baselineCandidates.length - 1] : sorted[0];
+
+  if(!latest || !baseline || latest.id === baseline.id){ el.innerHTML = "—"; return; }
+  const diff = baseline.value - latest.value;
+  const sign = diff > 0 ? "-" : (diff < 0 ? "+" : "");
+  el.innerHTML = sign + Math.abs(diff).toFixed(1) + '<span class="stat-unit"> lb</span>';
+}
+
+function renderDashboard(){
+
+  const todayCals = foodLog.filter(f => f.date === todayStr()).reduce((s,f) => s + f.cal, 0);
+  document.getElementById("dash-cals").innerHTML = todayCals.toLocaleString() + '<span class="stat-unit">kcal</span>';
+
+  if(walks.length){
+    const last = walks[walks.length-1];
+    document.getElementById("dash-walk").textContent = (last.name || "Walk") + " · " + last.distanceMi.toFixed(1) + " mi";
+  }else{
+    document.getElementById("dash-walk").textContent = "—";
+  }
+}
+
+/* ================= CALENDAR ================= */
+let calDate = new Date();
+calDate.setDate(1);
+
+function calShiftMonth(delta){
+  calDate.setMonth(calDate.getMonth() + delta);
+  renderCalendar();
+}
+
+function dateHasData(dstr){
+  return weightEntries.some(e => e.date === dstr) ||
+         stepsEntries.some(e => e.date === dstr) ||
+         foodLog.some(f => f.date === dstr) ||
+         walks.some(w => w.date === dstr) ||
+         notesEntries.some(n => n.date === dstr);
+}
+
+function renderCalendar(){
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  document.getElementById("cal-month-label").textContent =
+    calDate.toLocaleDateString(undefined, { month:"long", year:"numeric" });
+
+  const dowRow = document.getElementById("cal-dow-row");
+  dowRow.innerHTML = ["S","M","T","W","T","F","S"].map(d => `<div class="cal-dow">${d}</div>`).join("");
+
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = todayStr();
+
+  let cells = "";
+  for(let i=0;i<startOffset;i++) cells += '<div class="cal-day empty-cell"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const dstr = year + "-" + String(month+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+    const hasData = dateHasData(dstr);
+    const isToday = dstr === today;
+    cells += `<div class="cal-day${isToday ? " today" : ""}" onclick="openDayModal('${dstr}')">
+      <span>${d}</span>${hasData ? '<span class="cal-dot"></span>' : ''}
+    </div>`;
+  }
+  document.getElementById("cal-grid").innerHTML = cells;
+}
+
+function openDayModal(dstr){
+  const dt = new Date(dstr + "T00:00:00");
+  document.getElementById("day-modal-title").textContent =
+    dt.toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric" });
+
+  const w = weightEntries.find(e => e.date === dstr);
+  const s = stepsEntries.find(e => e.date === dstr);
+  const foods = foodLog.filter(f => f.date === dstr);
+  const dayWalks = walks.filter(x => x.date === dstr);
+  const calTotal = foods.reduce((sum,f) => sum + f.cal, 0);
+
+  let html = '<div class="stat-grid" style="margin-bottom:14px;">';
+  html += `<div class="stat"><div class="stat-label">Weight</div><div class="stat-value">${w ? w.value.toFixed(1) + '<span class="stat-unit">lb</span>' : '—'}</div></div>`;
+  html += `<div class="stat"><div class="stat-label">Steps</div><div class="stat-value">${s ? s.value.toLocaleString() : '—'}</div></div>`;
+  html += `<div class="stat"><div class="stat-label">Calories</div><div class="stat-value">${calTotal ? calTotal.toLocaleString() + '<span class="stat-unit">kcal</span>' : '—'}</div></div>`;
+  html += `<div class="stat"><div class="stat-label">Walks</div><div class="stat-value">${dayWalks.length || '—'}</div></div>`;
+  html += '</div>';
+
+  if(foods.length){
+    html += '<div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--panel-ink-soft); margin-bottom:6px;">Food</div>';
+    html += foods.map(f => `<div class="entry-row"><div class="entry-main">${f.name}</div><span class="entry-sub">${foodEntryLabel(f)}</span></div>`).join("");
+  }
+  if(dayWalks.length){
+    html += '<div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--panel-ink-soft); margin:12px 0 6px;">Walks</div>';
+    html += dayWalks.map(x => `<div class="entry-row"><div class="entry-main">${x.name || "Walk"}</div><span class="entry-value">${x.distanceMi.toFixed(2)} mi</span></div>`).join("");
+  }
+  if(!w && !s && foods.length===0 && dayWalks.length===0){
+    html += '<div class="empty">Nothing logged this day.</div>';
+  }
+
+  const note = notesEntries.find(n => n.date === dstr);
+  if(note){
+    html += '<div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--panel-ink-soft); margin:12px 0 6px;">Note</div>';
+    html += `<div class="entry-sub" style="font-family: var(--sans); font-size:13px; color: var(--panel-ink);">${note.text}</div>`;
+  }
+
+  document.getElementById("day-modal-body").innerHTML = html;
+  document.getElementById("day-modal-backdrop").classList.remove("hidden");
+}
+function closeDayModal(){
+  document.getElementById("day-modal-backdrop").classList.add("hidden");
+}
+
+/* ================= BACKUP / RESTORE ================= */
+function exportData(){
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    ft_weight: weightEntries,
+    ft_steps: stepsEntries,
+    ft_cal_presets: legacyPresets,
+    ft_cal_log: foodLog,
+    ft_food_defs: foodDefs,
+    ft_walks: walks,
+    ft_notes: notesEntries
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "viking-fitness-backup-" + todayStr() + ".json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importData(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!confirm("This will replace the data currently on this device with the backup file. Continue?")) return;
+      weightEntries = data.ft_weight || [];
+      stepsEntries = data.ft_steps || [];
+      legacyPresets = data.ft_cal_presets || [];
+      foodLog = data.ft_cal_log || [];
+      foodDefs = data.ft_food_defs || {};
+      walks = data.ft_walks || [];
+      notesEntries = data.ft_notes || [];
+      saveData("ft_weight", weightEntries);
+      saveData("ft_steps", stepsEntries);
+      saveData("ft_cal_presets", legacyPresets);
+      saveData("ft_cal_log", foodLog);
+      saveData("ft_food_defs", foodDefs);
+      saveData("ft_walks", walks);
+      saveData("ft_notes", notesEntries);
+      refreshAll();
+      alert("Backup restored.");
+    }catch(err){
+      alert("Couldn't read that file — make sure it's a Viking Fitness backup JSON file.");
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = "";
+}
+
+/* ================= INIT ================= */
+function refreshAll(){
+  renderDashboard();
+  renderDashMileage();
+  renderDashWeightChange();
+  renderWeight();
+  renderWalks();
+  renderCalories();
+  renderSteps();
+  renderCalendar();
+  renderMileage();
+  renderNotes();
+  renderStreak();
+}
+document.getElementById("weight-date").value = todayStr();
+document.getElementById("steps-date").value = todayStr();
+document.getElementById("mwalk-date").value = todayStr();
+document.getElementById("mi-pill-week").classList.add("active");
+document.getElementById("note-date").value = todayStr();
+refreshAll();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
