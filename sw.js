@@ -1,7 +1,8 @@
-const CACHE_NAME = "trailhead-cache-v14";
+const CACHE_NAME = "trailhead-cache-v15";
 const ASSETS = [
   "./",
   "./index.html",
+  "./config.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"

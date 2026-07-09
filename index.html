@@ -986,19 +986,19 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
 <script>
 /* ================= SUPABASE AUTH ================= */
-/* ⬇⬇⬇  PASTE YOUR TWO VALUES BETWEEN THE QUOTES BELOW  ⬇⬇⬇ */
-const SUPABASE_URL = "https://yjihfhvfcwjwfdcjiale.supabase.co";
-const SUPABASE_KEY = "sb_publishable_Dz42UPnSizMNq-V-P1fYww_aomasqqg";
-/* ⬆⬆⬆  PASTE YOUR TWO VALUES BETWEEN THE QUOTES ABOVE  ⬆⬆⬆ */
+/* Keys are loaded from config.js (which you only upload once and never overwrite). */
+const SUPABASE_URL = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL) || "";
+const SUPABASE_KEY = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_KEY) || "";
 
 let sb = null;
 let authMode = "login"; // or "signup"
 
 function initSupabase(){
-  if(typeof supabase === "undefined" || SUPABASE_URL.startsWith("PASTE")){
+  if(typeof supabase === "undefined" || !SUPABASE_URL || !SUPABASE_KEY){
     // Not configured yet — skip auth, show app directly (dev fallback)
     document.getElementById("auth-screen").classList.add("hidden");
     return;
