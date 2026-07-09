@@ -990,8 +990,8 @@
 <script>
 /* ================= SUPABASE AUTH ================= */
 /* ⬇⬇⬇  PASTE YOUR TWO VALUES BETWEEN THE QUOTES BELOW  ⬇⬇⬇ */
-const SUPABASE_URL = "https://yjihfhvfcwjwfdcjiale.supabase.co";
-const SUPABASE_KEY = "sb_publishable_Dz42UPnSizMNq-V-P1fYww_aomasqqg";
+const SUPABASE_URL = "PASTE_YOUR_PROJECT_URL_HERE";
+const SUPABASE_KEY = "PASTE_YOUR_PUBLISHABLE_KEY_HERE";
 /* ⬆⬆⬆  PASTE YOUR TWO VALUES BETWEEN THE QUOTES ABOVE  ⬆⬆⬆ */
 
 let sb = null;
@@ -1072,6 +1072,7 @@ function showApp(){
         if(note) note.textContent = "Signed in as " + data.user.email;
       }
     });
+    loadWeightFromCloud();
   }
 }
 
@@ -1152,10 +1153,37 @@ const DAILY_QUOTES = [
 /* ================= WEIGHT ================= */
 let weightEntries = loadData("ft_weight", []);
 
-function addWeight(){
+async function loadWeightFromCloud(){
+  if(!sb) return; // not connected — keep local
+  try{
+    const { data, error } = await sb.from("weight_entries").select("*").order("date");
+    if(error){ console.warn("weight load error", error.message); return; }
+    weightEntries = data.map(r => ({ id: r.id, date: r.date, value: Number(r.value) }));
+    saveData("ft_weight", weightEntries); // keep a local mirror for offline viewing
+    renderWeight();
+    renderDashboard();
+    renderDashWeightChange();
+  }catch(e){ console.warn("weight load failed", e); }
+}
+
+async function addWeight(){
   const val = parseFloat(document.getElementById("weight-input").value);
   const date = document.getElementById("weight-date").value || todayStr();
   if(!val || val <= 0){ alert("Enter a valid weight."); return; }
+
+  if(sb){
+    try{
+      // remove any existing entry for that date (one weight per day), then insert
+      await sb.from("weight_entries").delete().eq("date", date);
+      const { error } = await sb.from("weight_entries").insert({ date, value: val });
+      if(error){ alert("Couldn't save to cloud: " + error.message); return; }
+      document.getElementById("weight-input").value = "";
+      await loadWeightFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server. Check your connection."); return; }
+  }
+
+  // local fallback (not logged in)
   weightEntries = weightEntries.filter(e => e.date !== date);
   weightEntries.push({ id: uid(), date, value: val });
   weightEntries.sort((a,b) => a.date.localeCompare(b.date));
@@ -1164,11 +1192,21 @@ function addWeight(){
   renderWeight();
   renderDashboard();
 }
-function deleteWeight(id){
+
+async function deleteWeight(id){
+  if(sb){
+    try{
+      const { error } = await sb.from("weight_entries").delete().eq("id", id);
+      if(error){ alert("Couldn't delete: " + error.message); return; }
+      await loadWeightFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   weightEntries = weightEntries.filter(e => e.id !== id);
   saveData("ft_weight", weightEntries);
   renderWeight(); renderDashboard();
 }
+
 function renderWeight(){
   const list = document.getElementById("weight-list");
   if(weightEntries.length === 0){
