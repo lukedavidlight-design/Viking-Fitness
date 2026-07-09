@@ -318,6 +318,27 @@
   .backup-row button{ flex:1; }
   .mileage-pill.active{ background: var(--accent); color: var(--navy); border-color: var(--accent); }
 
+  /* Collapsible + movable cards */
+  .card-plain{
+    background: transparent; border: none; box-shadow: none; padding: 0; overflow: visible;
+  }
+  .card-plain > h2{ color: var(--ink-soft); margin: 0 0 10px; }
+  .card > h2{ cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .card.collapsed > *:not(h2){ display: none !important; }
+  .blk-ctl{
+    margin-left: auto; display: flex; gap: 4px; align-items: center; flex-shrink: 0;
+  }
+  .blk-btn{
+    width: 24px; height: 24px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(28,151,179,0.08); color: var(--accent-deep);
+    border: 1px solid var(--panel-line); border-radius: 6px;
+    font-size: 11px; line-height: 1;
+  }
+  .card-plain .blk-btn{ background: rgba(51,199,232,0.12); border-color: rgba(51,199,232,0.25); color: var(--accent); }
+  .blk-chev{ transition: transform 0.15s ease; }
+  .card.collapsed .blk-chev{ transform: rotate(-90deg); }
+
   /* Login screen */
   #auth-screen{
     position: fixed; inset: 0; z-index: 100;
@@ -507,7 +528,9 @@
       <div id="today-plan-list"></div>
     </div>
 
-    <div class="tile-grid" style="margin-bottom:14px;">
+    <div class="card card-plain">
+      <h2>Overview</h2>
+      <div class="tile-grid">
       <div class="tile tile-amber">
         <div class="tile-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"></path></svg>
@@ -563,6 +586,7 @@
         </div>
       </div>
     </div>
+    </div>
 
     <div class="card">
       <h2>Quick add</h2>
@@ -611,10 +635,8 @@
     </div>
 
     <div class="card">
-      <details class="manual-details">
-        <summary>History</summary>
-        <div id="weight-list"></div>
-      </details>
+      <h2>History</h2>
+      <div id="weight-list"></div>
     </div>
   </section>
 
@@ -651,9 +673,9 @@
       <div class="small-note-standalone" id="walk-gps-note">Uses your phone's GPS — allow location access when prompted.</div>
     </div>
 
-    <div class="card">
-      <details class="manual-details" id="manual-walk-details">
-        <summary>Log a walk manually</summary>
+    <div class="card" id="manual-walk-card">
+      <h2>Log a walk manually</h2>
+      <div>
         <div class="field-row">
           <div>
             <label>Walk name</label>
@@ -685,10 +707,12 @@
           </div>
         </div>
         <button class="btn-ghost" style="width:100%" onclick="addManualWalk()">Save manual walk</button>
-      </details>
+      </div>
     </div>
 
-    <div class="stat-grid" style="margin-bottom:14px;">
+    <div class="card card-plain">
+      <h2>Totals</h2>
+      <div class="stat-grid">
       <div class="stat stat-range">
         <div class="stat-range-head">
           <span class="stat-label">Mileage</span>
@@ -727,6 +751,7 @@
           <button class="btn-ghost btn-small" style="width:100%" onclick="renderWalkPace()">Update</button>
         </div>
       </div>
+    </div>
     </div>
 
     <div class="card">
@@ -791,10 +816,8 @@
     </div>
 
     <div class="card">
-      <details class="manual-details">
-        <summary>Previous days</summary>
-        <div id="cal-history-list"></div>
-      </details>
+      <h2>Previous days</h2>
+      <div id="cal-history-list"></div>
     </div>
   </section>
 
@@ -822,16 +845,15 @@
     </div>
 
     <div class="card">
-      <details class="manual-details">
-        <summary>History</summary>
-        <div id="steps-list"></div>
-      </details>
+      <h2>History</h2>
+      <div id="steps-list"></div>
     </div>
   </section>
 
   <!-- CALENDAR (with Notes merged in) -->
   <section class="section" id="tab-calendar">
     <div class="card">
+      <h2>Calendar</h2>
       <div class="cal-header">
         <button onclick="calShiftMonth(-1)">‹ Prev</button>
         <div class="cal-month-label" id="cal-month-label">—</div>
@@ -843,29 +865,27 @@
     </div>
 
     <div class="card">
-      <details class="manual-details">
-        <summary>Add a note</summary>
+      <h2>Add a note</h2>
+      <div>
         <label>Date</label>
         <input type="date" id="note-date" />
         <label>Note</label>
         <textarea id="note-text" rows="4" placeholder="Anything worth remembering about today..."></textarea>
         <button class="btn-primary" onclick="saveNote()">Save note</button>
-      </details>
+      </div>
     </div>
 
     <div class="card">
-      <details class="manual-details">
-        <summary>All notes</summary>
-        <div id="notes-list"></div>
-      </details>
+      <h2>All notes</h2>
+      <div id="notes-list"></div>
     </div>
   </section>
 
   <!-- GOALS -->
   <section class="section" id="tab-goals">
     <div class="card">
-      <details class="manual-details" id="new-goal-details">
-        <summary>Create a new goal</summary>
+      <h2>Create a new goal</h2>
+      <div id="new-goal-body">
         <div class="field-row">
           <div>
             <label>Goal name</label>
@@ -879,10 +899,13 @@
         <label>Description (optional)</label>
         <input type="text" id="goal-desc" placeholder="10k race — build up gradually" />
         <button class="btn-primary" onclick="addGoal()">Create goal</button>
-      </details>
+      </div>
     </div>
 
-    <div id="goals-list"></div>
+    <div class="card card-plain">
+      <h2>Your goals</h2>
+      <div id="goals-list"></div>
+    </div>
   </section>
 
   <!-- SETTINGS -->
@@ -1073,6 +1096,8 @@ function showApp(){
       }
     });
     loadWeightFromCloud();
+    loadStepsFromCloud();
+    loadNotesFromCloud();
   }
 }
 
@@ -1228,10 +1253,34 @@ function renderWeight(){
 /* ================= STEPS ================= */
 let stepsEntries = loadData("ft_steps", []);
 
-function addSteps(){
+async function loadStepsFromCloud(){
+  if(!sb) return;
+  try{
+    const { data, error } = await sb.from("steps_entries").select("*").order("date");
+    if(error){ console.warn("steps load error", error.message); return; }
+    stepsEntries = data.map(r => ({ id: r.id, date: r.date, value: Number(r.value) }));
+    saveData("ft_steps", stepsEntries);
+    renderSteps();
+    renderDashboard();
+  }catch(e){ console.warn("steps load failed", e); }
+}
+
+async function addSteps(){
   const val = parseInt(document.getElementById("steps-input").value, 10);
   const date = document.getElementById("steps-date").value || todayStr();
   if(!val || val < 0){ alert("Enter a valid step count."); return; }
+
+  if(sb){
+    try{
+      await sb.from("steps_entries").delete().eq("date", date);
+      const { error } = await sb.from("steps_entries").insert({ date, value: val });
+      if(error){ alert("Couldn't save to cloud: " + error.message); return; }
+      document.getElementById("steps-input").value = "";
+      await loadStepsFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
   stepsEntries = stepsEntries.filter(e => e.date !== date);
   stepsEntries.push({ id: uid(), date, value: val });
   stepsEntries.sort((a,b) => a.date.localeCompare(b.date));
@@ -1240,11 +1289,21 @@ function addSteps(){
   renderSteps();
   renderDashboard();
 }
-function deleteSteps(id){
+
+async function deleteSteps(id){
+  if(sb){
+    try{
+      const { error } = await sb.from("steps_entries").delete().eq("id", id);
+      if(error){ alert("Couldn't delete: " + error.message); return; }
+      await loadStepsFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   stepsEntries = stepsEntries.filter(e => e.id !== id);
   saveData("ft_steps", stepsEntries);
   renderSteps(); renderDashboard();
 }
+
 function renderSteps(){
   const list = document.getElementById("steps-list");
   if(stepsEntries.length === 0){
@@ -1575,13 +1634,13 @@ function deleteWalk(id){
 function repeatWalk(id){
   const w = walks.find(x => x.id === id);
   if(!w) return;
-  document.getElementById("manual-walk-details").open = true;
+  expandCard(document.getElementById("manual-walk-card"));
   document.getElementById("mwalk-name").value = w.name || "";
   document.getElementById("mwalk-distance").value = w.distanceMi;
   document.getElementById("mwalk-location").value = w.location || "";
   document.getElementById("mwalk-duration").value = w.durationMin;
   document.getElementById("mwalk-date").value = todayStr();
-  document.getElementById("manual-walk-details").scrollIntoView({ behavior:"smooth", block:"center" });
+  document.getElementById("manual-walk-card").scrollIntoView({ behavior:"smooth", block:"center" });
 }
 
 function openPhotoModal(walkId){
@@ -1892,10 +1951,34 @@ function renderPaceChart(){
 /* ================= NOTES ================= */
 let notesEntries = loadData("ft_notes", []); // {id, date, text}
 
-function saveNote(){
+async function loadNotesFromCloud(){
+  if(!sb) return;
+  try{
+    const { data, error } = await sb.from("notes_entries").select("*").order("date");
+    if(error){ console.warn("notes load error", error.message); return; }
+    notesEntries = data.map(r => ({ id: r.id, date: r.date, text: r.text }));
+    saveData("ft_notes", notesEntries);
+    renderNotes();
+    renderCalendar();
+  }catch(e){ console.warn("notes load failed", e); }
+}
+
+async function saveNote(){
   const date = document.getElementById("note-date").value || todayStr();
   const text = document.getElementById("note-text").value.trim();
   if(!text){ alert("Write something first."); return; }
+
+  if(sb){
+    try{
+      await sb.from("notes_entries").delete().eq("date", date);
+      const { error } = await sb.from("notes_entries").insert({ date, text });
+      if(error){ alert("Couldn't save to cloud: " + error.message); return; }
+      document.getElementById("note-text").value = "";
+      await loadNotesFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
   notesEntries = notesEntries.filter(n => n.date !== date);
   notesEntries.push({ id: uid(), date, text });
   notesEntries.sort((a,b) => a.date.localeCompare(b.date));
@@ -1903,11 +1986,21 @@ function saveNote(){
   document.getElementById("note-text").value = "";
   renderNotes();
 }
-function deleteNote(id){
+
+async function deleteNote(id){
+  if(sb){
+    try{
+      const { error } = await sb.from("notes_entries").delete().eq("id", id);
+      if(error){ alert("Couldn't delete: " + error.message); return; }
+      await loadNotesFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   notesEntries = notesEntries.filter(n => n.id !== id);
   saveData("ft_notes", notesEntries);
   renderNotes();
 }
+
 function renderNotes(){
   const list = document.getElementById("notes-list");
   if(!list) return;
@@ -1961,7 +2054,7 @@ function addGoal(){
   document.getElementById("goal-name").value = "";
   document.getElementById("goal-target-date").value = "";
   document.getElementById("goal-desc").value = "";
-  document.getElementById("new-goal-details").open = false;
+  collapseCard(document.querySelector('[data-bid="tab-goals:createanewgoal"]'));
   renderGoals();
   renderCalendar();
   renderTodayPlan();
@@ -2478,6 +2571,111 @@ function importData(event){
   event.target.value = "";
 }
 
+/* ================= LAYOUT: COLLAPSE + REORDER ================= */
+let layoutState = loadData("ft_layout_v1", { collapsed: {}, order: {} });
+// Cards that start collapsed by default (until the user changes them)
+const DEFAULT_COLLAPSED = new Set([
+  "tab-weight:history",
+  "tab-walks:logawalkmanually",
+  "tab-calories:previousdays",
+  "tab-steps:history",
+  "tab-calendar:addanote",
+  "tab-calendar:allnotes",
+  "tab-goals:createanewgoal"
+]);
+
+function slugLabel(s){ return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
+function saveLayout(){ saveData("ft_layout_v1", layoutState); }
+
+function getSectionBlocks(section){
+  return Array.from(section.children).filter(el => el.classList && el.classList.contains("card"));
+}
+
+function setupLayout(){
+  document.querySelectorAll("main > section").forEach(section => {
+    const blocks = getSectionBlocks(section);
+    blocks.forEach(card => {
+      const h2 = card.querySelector(":scope > h2");
+      if(!h2) return;
+      const bid = section.id + ":" + slugLabel(h2.textContent);
+      card.dataset.bid = bid;
+
+      // controls: up, down, chevron
+      const ctl = document.createElement("span");
+      ctl.className = "blk-ctl";
+      ctl.innerHTML = `
+        <button class="blk-btn" aria-label="Move up" onclick="moveBlock(event,'${bid}',-1)">▲</button>
+        <button class="blk-btn" aria-label="Move down" onclick="moveBlock(event,'${bid}',1)">▼</button>
+        <button class="blk-btn blk-chev" aria-label="Collapse">▾</button>
+      `;
+      h2.appendChild(ctl);
+      h2.addEventListener("click", (e) => {
+        if(e.target.closest(".blk-btn") && !e.target.closest(".blk-chev")) return;
+        toggleBlockCollapse(bid);
+      });
+
+      // apply collapsed state (saved, or default)
+      const saved = layoutState.collapsed[bid];
+      const shouldCollapse = saved === undefined ? DEFAULT_COLLAPSED.has(bid) : saved;
+      if(shouldCollapse) card.classList.add("collapsed");
+    });
+    applySectionOrder(section);
+  });
+}
+
+function toggleBlockCollapse(bid){
+  const card = document.querySelector(`[data-bid="${bid}"]`);
+  if(!card) return;
+  const collapsed = card.classList.toggle("collapsed");
+  layoutState.collapsed[bid] = collapsed;
+  saveLayout();
+  if(!collapsed){
+    // leaflet maps need a size refresh after being unhidden
+    Object.values(leafletMaps).forEach(m => { try{ m.invalidateSize(); }catch(e){} });
+  }
+}
+
+function expandCard(card){
+  if(!card) return;
+  card.classList.remove("collapsed");
+  if(card.dataset.bid){ layoutState.collapsed[card.dataset.bid] = false; saveLayout(); }
+}
+function collapseCard(card){
+  if(!card) return;
+  card.classList.add("collapsed");
+  if(card.dataset.bid){ layoutState.collapsed[card.dataset.bid] = true; saveLayout(); }
+}
+
+function moveBlock(event, bid, dir){
+  event.stopPropagation();
+  const card = document.querySelector(`[data-bid="${bid}"]`);
+  if(!card) return;
+  const section = card.closest("section");
+  const blocks = getSectionBlocks(section);
+  const idx = blocks.indexOf(card);
+  const target = blocks[idx + dir];
+  if(!target) return; // already at edge
+  if(dir < 0) section.insertBefore(card, target);
+  else section.insertBefore(target, card);
+  layoutState.order[section.id] = getSectionBlocks(section).map(b => b.dataset.bid);
+  saveLayout();
+  Object.values(leafletMaps).forEach(m => { try{ m.invalidateSize(); }catch(e){} });
+}
+
+function applySectionOrder(section){
+  const savedOrder = layoutState.order[section.id];
+  if(!savedOrder || !savedOrder.length) return;
+  const blocks = getSectionBlocks(section);
+  const byId = {};
+  blocks.forEach(b => { if(b.dataset.bid) byId[b.dataset.bid] = b; });
+  savedOrder.forEach(bid => {
+    const b = byId[bid];
+    if(b) section.appendChild(b);
+  });
+  // any new blocks not in the saved order stay after (appendChild order above pushes known ones in sequence)
+}
+
 /* ================= INIT ================= */
 function refreshAll(){
   renderDashboard();
@@ -2502,6 +2700,7 @@ document.getElementById("steps-date").value = todayStr();
 document.getElementById("mwalk-date").value = todayStr();
 document.getElementById("sort-pill-date").classList.add("active");
 document.getElementById("note-date").value = todayStr();
+setupLayout();
 refreshAll();
 initSupabase();
 
