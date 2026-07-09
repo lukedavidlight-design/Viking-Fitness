@@ -1,4 +1,4 @@
-const CACHE_NAME = "trailhead-cache-v12";
+const CACHE_NAME = "trailhead-cache-v13";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  // Never cache or intercept Supabase or other cross-origin API calls — always go to network
+  if (url.origin !== self.location.origin || url.hostname.includes("supabase")) {
+    return; // let the browser handle it normally
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

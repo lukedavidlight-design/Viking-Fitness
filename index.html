@@ -318,6 +318,38 @@
   .backup-row button{ flex:1; }
   .mileage-pill.active{ background: var(--accent); color: var(--navy); border-color: var(--accent); }
 
+  /* Login screen */
+  #auth-screen{
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    background-image:
+      radial-gradient(600px circle at 15% 0%, rgba(51,199,232,0.16), transparent 60%),
+      radial-gradient(500px circle at 100% 10%, rgba(255,180,84,0.10), transparent 55%);
+    display:flex; align-items:center; justify-content:center;
+    padding: 20px; overflow-y:auto;
+  }
+  #auth-screen.hidden{ display:none; }
+  .auth-card{
+    background: linear-gradient(150deg, #FFFFFF, #E4F2FA);
+    border: 1px solid var(--panel-line);
+    border-radius: 20px; padding: 28px 22px;
+    width: 100%; max-width: 380px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  .auth-logo{ text-align:center; margin-bottom: 6px; }
+  .auth-logo .brand-blaze{ width:11px; height:11px; }
+  .auth-title{
+    text-align:center; font-weight:800; text-transform:uppercase; letter-spacing:0.03em;
+    font-size: 22px; color: var(--panel-ink); margin: 0 0 4px;
+  }
+  .auth-sub{ text-align:center; font-size:12px; color: var(--panel-ink-soft); margin-bottom:20px; font-family:var(--mono); }
+  #auth-error{ color: var(--danger-deep); font-size:13px; text-align:center; margin-bottom:10px; min-height:16px; }
+  .auth-toggle{ text-align:center; margin-top:14px; font-size:13px; color: var(--panel-ink-soft); }
+  .auth-toggle button{
+    background:none; border:none; color: var(--accent-deep); font-weight:700; padding:0;
+    text-transform:none; letter-spacing:0; font-size:13px; text-decoration:underline; cursor:pointer;
+  }
+
   /* Goals */
   .goal-progress-track{
     height: 8px; border-radius: 6px; background: var(--panel-line); overflow:hidden; margin: 8px 0 4px;
@@ -398,6 +430,23 @@
 </style>
 </head>
 <body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo"><span class="brand-blaze"></span></div>
+    <h1 class="auth-title">Viking Fitness</h1>
+    <div class="auth-sub" id="auth-mode-label">Log in to continue</div>
+    <div id="auth-error"></div>
+    <label>Email</label>
+    <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+    <label>Password</label>
+    <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+    <button class="btn-primary" id="auth-submit-btn" onclick="handleAuthSubmit()">Log in</button>
+    <div class="auth-toggle" id="auth-toggle">
+      Don't have an account? <button onclick="toggleAuthMode()">Sign up</button>
+    </div>
+  </div>
+</div>
 
 <div class="brand-head">
   <div class="brand-badges">
@@ -849,8 +898,14 @@
     </div>
 
     <div class="card">
+      <h2>Account</h2>
+      <div class="small-note" style="margin-top:0;" id="account-email-note">Signed in.</div>
+      <button class="btn-ghost" style="width:100%" onclick="logOut()">Log out</button>
+    </div>
+
+    <div class="card">
       <h2>About</h2>
-      <div class="small-note" style="margin-top:0;">Viking Fitness — a personal tracker for weight, walks, food, and steps. No account needed; everything stays on this device unless you export a backup.</div>
+      <div class="small-note" style="margin-top:0;">Viking Fitness — a personal tracker for weight, walks, food, and steps.</div>
     </div>
   </section>
 
@@ -931,7 +986,95 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
 <script>
+/* ================= SUPABASE AUTH ================= */
+/* ⬇⬇⬇  PASTE YOUR TWO VALUES BETWEEN THE QUOTES BELOW  ⬇⬇⬇ */
+const SUPABASE_URL = "PASTE_YOUR_PROJECT_URL_HERE";
+const SUPABASE_KEY = "PASTE_YOUR_PUBLISHABLE_KEY_HERE";
+/* ⬆⬆⬆  PASTE YOUR TWO VALUES BETWEEN THE QUOTES ABOVE  ⬆⬆⬆ */
+
+let sb = null;
+let authMode = "login"; // or "signup"
+
+function initSupabase(){
+  if(typeof supabase === "undefined" || SUPABASE_URL.startsWith("PASTE")){
+    // Not configured yet — skip auth, show app directly (dev fallback)
+    document.getElementById("auth-screen").classList.add("hidden");
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sb.auth.getSession().then(({ data }) => {
+    if(data.session){
+      showApp();
+    }else{
+      document.getElementById("auth-screen").classList.remove("hidden");
+    }
+  });
+}
+
+function toggleAuthMode(){
+  authMode = authMode === "login" ? "signup" : "login";
+  const isLogin = authMode === "login";
+  document.getElementById("auth-mode-label").textContent = isLogin ? "Log in to continue" : "Create your account";
+  document.getElementById("auth-submit-btn").textContent = isLogin ? "Log in" : "Sign up";
+  document.getElementById("auth-toggle").innerHTML = isLogin
+    ? `Don't have an account? <button onclick="toggleAuthMode()">Sign up</button>`
+    : `Already have an account? <button onclick="toggleAuthMode()">Log in</button>`;
+  document.getElementById("auth-error").textContent = "";
+}
+
+async function handleAuthSubmit(){
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const errEl = document.getElementById("auth-error");
+  const btn = document.getElementById("auth-submit-btn");
+  errEl.textContent = "";
+  if(!email || !password){ errEl.textContent = "Enter your email and password."; return; }
+  if(!sb){ errEl.textContent = "Not connected to the server yet."; return; }
+
+  btn.disabled = true;
+  btn.textContent = authMode === "login" ? "Logging in..." : "Signing up...";
+  try{
+    let result;
+    if(authMode === "login"){
+      result = await sb.auth.signInWithPassword({ email, password });
+    }else{
+      result = await sb.auth.signUp({ email, password });
+    }
+    if(result.error){
+      errEl.textContent = result.error.message;
+    }else if(result.data.session){
+      showApp();
+    }else{
+      // signup without session (shouldn't happen with confirm-email off, but just in case)
+      errEl.textContent = "Account created — try logging in now.";
+      authMode = "login"; toggleAuthMode(); toggleAuthMode();
+    }
+  }catch(e){
+    errEl.textContent = "Something went wrong. Try again.";
+  }
+  btn.disabled = false;
+  btn.textContent = authMode === "login" ? "Log in" : "Sign up";
+}
+
+async function logOut(){
+  if(sb){ await sb.auth.signOut(); }
+  location.reload();
+}
+
+function showApp(){
+  document.getElementById("auth-screen").classList.add("hidden");
+  if(sb){
+    sb.auth.getUser().then(({ data }) => {
+      if(data && data.user){
+        const note = document.getElementById("account-email-note");
+        if(note) note.textContent = "Signed in as " + data.user.email;
+      }
+    });
+  }
+}
+
 /* ---------- storage helpers ---------- */
 function loadData(key, fallback){
   try{
@@ -2322,6 +2465,7 @@ document.getElementById("mwalk-date").value = todayStr();
 document.getElementById("sort-pill-date").classList.add("active");
 document.getElementById("note-date").value = todayStr();
 refreshAll();
+initSupabase();
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => {
