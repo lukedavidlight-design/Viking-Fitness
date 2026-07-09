@@ -1,11 +1,4 @@
-const supabaseUrl = "https://yjihfhvfcwjwfdcjiale.supabase.co";
-const supabaseKey = "sb_publishable_Dz42UPnSizMNq-V-P1fYww_aomasqqg";
-
-const supabaseClient = supabase.createClient(
-  supabaseUrl,
-  supabaseKey
-);
-const CACHE_NAME = "trailhead-cache-v5";
+const CACHE_NAME = "trailhead-cache-v12";
 const ASSETS = [
   "./",
   "./index.html",
