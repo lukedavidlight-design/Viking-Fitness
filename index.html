@@ -770,9 +770,23 @@
   <section class="section" id="tab-calories">
     <div class="card">
       <h2>Today's food log</h2>
-      <div class="stat" style="margin-bottom:12px;">
-        <div class="stat-label">Total today</div>
-        <div class="stat-value" id="cal-total">0<span class="stat-unit">kcal</span></div>
+      <div class="stat-grid" style="margin-bottom:12px;">
+        <div class="stat">
+          <div class="stat-label">Calories</div>
+          <div class="stat-value" id="cal-total">0<span class="stat-unit">kcal</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Protein</div>
+          <div class="stat-value" id="protein-total">0<span class="stat-unit">g</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Carbs</div>
+          <div class="stat-value" id="carbs-total">0<span class="stat-unit">g</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Fats</div>
+          <div class="stat-value" id="fats-total">0<span class="stat-unit">g</span></div>
+        </div>
       </div>
       <div id="cal-today-list"></div>
     </div>
@@ -811,7 +825,17 @@
           <input type="number" id="custom-food-protein" placeholder="38" />
         </div>
       </div>
-      <div class="small-note" style="margin-top:0;">Add grams too, and this food will scale automatically next time you log it from the Menu with a different amount.</div>
+      <div class="field-row">
+        <div>
+          <label>Carbs (g)</label>
+          <input type="number" id="custom-food-carbs" placeholder="45" />
+        </div>
+        <div>
+          <label>Fats (g)</label>
+          <input type="number" id="custom-food-fats" placeholder="12" />
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:0;">Only name and calories are required. Add grams and this food auto-scales (calories, protein, carbs, fats) next time you log it from the Menu with a different amount.</div>
       <button class="btn-primary" onclick="addCustomFood()">Add to today's log</button>
     </div>
 
@@ -1326,7 +1350,7 @@ function renderSteps(){
 /* ================= CALORIES / FOOD (with macros) ================= */
 let legacyPresets = loadData("ft_cal_presets", []);
 let foodLog = loadData("ft_cal_log", []); // {id, date, name, grams?, cal, protein?}
-let foodDefs = loadData("ft_food_defs", {}); // key: lowercase name -> {name, calPerGram, proteinPerGram, lastGrams}
+let foodDefs = loadData("ft_food_defs", {}); // key: lowercase name -> {name, calPerGram, proteinPerGram, carbsPerGram, fatsPerGram, lastGrams}
 let menuOpen = false;
 let pendingMenuFood = null;
 
@@ -1359,11 +1383,21 @@ function renderMenu(){
   list.innerHTML = items.length === 0
     ? '<div class="empty">Nothing logged yet — add a food below and it will show up here next time.</div>'
     : items.map(i => `
-      <div class="menu-item" onclick="onMenuItemClick('${i.name.replace(/'/g, "\\'")}')">
-        <span>${i.name}${i.grams ? ` <span style="color:var(--panel-ink-soft); font-size:12px;">(${i.grams}g last time)</span>` : ""}</span>
-        <span class="kcal">${i.cal} kcal</span>
+      <div class="menu-item">
+        <span onclick="onMenuItemClick('${i.name.replace(/'/g, "\\'")}')" style="flex:1; cursor:pointer;">${i.name}${i.grams ? ` <span style="color:var(--panel-ink-soft); font-size:12px;">(${i.grams}g last time)</span>` : ""}</span>
+        <span class="kcal" onclick="onMenuItemClick('${i.name.replace(/'/g, "\\'")}')" style="cursor:pointer;">${i.cal} kcal</span>
+        <button class="btn-danger-outline" style="margin-left:8px;" onclick="deleteMenuItem(event, '${i.name.replace(/'/g, "\\'")}')">×</button>
       </div>
     `).join("");
+}
+
+function deleteMenuItem(event, name){
+  event.stopPropagation();
+  const key = name.toLowerCase();
+  if(foodDefs[key]){ delete foodDefs[key]; saveData("ft_food_defs", foodDefs); }
+  legacyPresets = legacyPresets.filter(p => p.name.toLowerCase() !== key);
+  saveData("ft_cal_presets", legacyPresets);
+  renderMenu();
 }
 
 function onMenuItemClick(name){
@@ -1391,8 +1425,10 @@ function confirmMenuGrams(){
   if(!def) return;
   const cal = Math.round(def.calPerGram * grams);
   const protein = def.proteinPerGram != null ? Math.round(def.proteinPerGram * grams * 10) / 10 : null;
+  const carbs = def.carbsPerGram != null ? Math.round(def.carbsPerGram * grams * 10) / 10 : null;
+  const fats = def.fatsPerGram != null ? Math.round(def.fatsPerGram * grams * 10) / 10 : null;
 
-  foodLog.push({ id: uid(), date: todayStr(), name: def.name, grams, cal, protein });
+  foodLog.push({ id: uid(), date: todayStr(), name: def.name, grams, cal, protein, carbs, fats });
   def.lastGrams = grams;
   foodDefs[pendingMenuFood.toLowerCase()] = def;
   saveData("ft_cal_log", foodLog);
@@ -1409,11 +1445,15 @@ function addCustomFood(){
   const grams = parseFloat(document.getElementById("custom-food-grams").value);
   const cal = parseInt(document.getElementById("custom-food-cal").value, 10);
   const protein = parseFloat(document.getElementById("custom-food-protein").value);
+  const carbs = parseFloat(document.getElementById("custom-food-carbs").value);
+  const fats = parseFloat(document.getElementById("custom-food-fats").value);
   if(!name || !cal){ alert("Enter at least a food name and calories."); return; }
 
   const entry = { id: uid(), date: todayStr(), name, cal };
   if(grams){ entry.grams = grams; }
   if(!isNaN(protein)){ entry.protein = protein; }
+  if(!isNaN(carbs)){ entry.carbs = carbs; }
+  if(!isNaN(fats)){ entry.fats = fats; }
   foodLog.push(entry);
   saveData("ft_cal_log", foodLog);
 
@@ -1422,15 +1462,15 @@ function addCustomFood(){
       name,
       calPerGram: cal / grams,
       proteinPerGram: !isNaN(protein) ? protein / grams : null,
+      carbsPerGram: !isNaN(carbs) ? carbs / grams : null,
+      fatsPerGram: !isNaN(fats) ? fats / grams : null,
       lastGrams: grams
     };
     saveData("ft_food_defs", foodDefs);
   }
 
-  document.getElementById("custom-food-name").value = "";
-  document.getElementById("custom-food-grams").value = "";
-  document.getElementById("custom-food-cal").value = "";
-  document.getElementById("custom-food-protein").value = "";
+  ["custom-food-name","custom-food-grams","custom-food-cal","custom-food-protein","custom-food-carbs","custom-food-fats"]
+    .forEach(id => document.getElementById(id).value = "");
   renderCalories();
   renderDashboard();
 }
@@ -1446,7 +1486,9 @@ function foodEntryLabel(f){
   let parts = [];
   if(f.grams) parts.push(f.grams + "g");
   parts.push(f.cal + " kcal");
-  if(f.protein != null) parts.push(f.protein + "g protein");
+  if(f.protein != null) parts.push(f.protein + "g P");
+  if(f.carbs != null) parts.push(f.carbs + "g C");
+  if(f.fats != null) parts.push(f.fats + "g F");
   return parts.join(" · ");
 }
 
@@ -1454,7 +1496,14 @@ function renderCalories(){
   const today = todayStr();
   const todays = foodLog.filter(f => f.date === today);
   const total = todays.reduce((s,f) => s + f.cal, 0);
+  const proteinTotal = todays.reduce((s,f) => s + (f.protein || 0), 0);
+  const carbsTotal = todays.reduce((s,f) => s + (f.carbs || 0), 0);
+  const fatsTotal = todays.reduce((s,f) => s + (f.fats || 0), 0);
+  const r1 = n => Math.round(n * 10) / 10;
   document.getElementById("cal-total").innerHTML = total.toLocaleString() + '<span class="stat-unit">kcal</span>';
+  document.getElementById("protein-total").innerHTML = r1(proteinTotal) + '<span class="stat-unit">g</span>';
+  document.getElementById("carbs-total").innerHTML = r1(carbsTotal) + '<span class="stat-unit">g</span>';
+  document.getElementById("fats-total").innerHTML = r1(fatsTotal) + '<span class="stat-unit">g</span>';
 
   const todayList = document.getElementById("cal-today-list");
   todayList.innerHTML = todays.length === 0
