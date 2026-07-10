@@ -1123,6 +1123,7 @@ function showApp(){
     loadStepsFromCloud();
     loadNotesFromCloud();
     loadWalksFromCloud();
+    loadFoodFromCloud();
   }
 }
 
@@ -1349,10 +1350,76 @@ function renderSteps(){
 
 /* ================= CALORIES / FOOD (with macros) ================= */
 let legacyPresets = loadData("ft_cal_presets", []);
-let foodLog = loadData("ft_cal_log", []); // {id, date, name, grams?, cal, protein?}
+let foodLog = loadData("ft_cal_log", []); // {id, date, name, grams?, cal, protein?, carbs?, fats?}
 let foodDefs = loadData("ft_food_defs", {}); // key: lowercase name -> {name, calPerGram, proteinPerGram, carbsPerGram, fatsPerGram, lastGrams}
 let menuOpen = false;
 let pendingMenuFood = null;
+
+function rowToFoodEntry(r){
+  const e = { id: r.id, date: r.date, name: r.name, cal: r.cal };
+  if(r.grams != null) e.grams = Number(r.grams);
+  if(r.protein != null) e.protein = Number(r.protein);
+  if(r.carbs != null) e.carbs = Number(r.carbs);
+  if(r.fats != null) e.fats = Number(r.fats);
+  return e;
+}
+function foodEntryToRow(e){
+  return {
+    date: e.date, name: e.name, cal: e.cal,
+    grams: e.grams != null ? e.grams : null,
+    protein: e.protein != null ? e.protein : null,
+    carbs: e.carbs != null ? e.carbs : null,
+    fats: e.fats != null ? e.fats : null
+  };
+}
+
+async function loadFoodFromCloud(){
+  if(!sb) return;
+  try{
+    const { data: logRows, error: e1 } = await sb.from("food_log").select("*").order("date");
+    if(e1){ console.warn("food log load error", e1.message); }
+    else{
+      foodLog = logRows.map(rowToFoodEntry);
+      saveData("ft_cal_log", foodLog);
+    }
+    const { data: defRows, error: e2 } = await sb.from("food_defs").select("*");
+    if(e2){ console.warn("food defs load error", e2.message); }
+    else{
+      foodDefs = {};
+      defRows.forEach(r => {
+        foodDefs[r.name.toLowerCase()] = {
+          _rowId: r.id,
+          name: r.name,
+          calPerGram: r.cal_per_gram != null ? Number(r.cal_per_gram) : null,
+          proteinPerGram: r.protein_per_gram != null ? Number(r.protein_per_gram) : null,
+          carbsPerGram: r.carbs_per_gram != null ? Number(r.carbs_per_gram) : null,
+          fatsPerGram: r.fats_per_gram != null ? Number(r.fats_per_gram) : null,
+          lastGrams: r.last_grams != null ? Number(r.last_grams) : null
+        };
+      });
+      saveData("ft_food_defs", foodDefs);
+    }
+    renderCalories();
+    renderDashboard();
+  }catch(e){ console.warn("food load failed", e); }
+}
+
+async function upsertFoodDef(def){
+  if(!sb) return;
+  const row = {
+    name: def.name,
+    cal_per_gram: def.calPerGram,
+    protein_per_gram: def.proteinPerGram,
+    carbs_per_gram: def.carbsPerGram,
+    fats_per_gram: def.fatsPerGram,
+    last_grams: def.lastGrams
+  };
+  try{
+    // one def per name per user: delete existing then insert
+    await sb.from("food_defs").delete().eq("name", def.name);
+    await sb.from("food_defs").insert(row);
+  }catch(e){ console.warn("food def save failed", e); }
+}
 
 function toggleMenu(){
   menuOpen = !menuOpen;
@@ -1391,16 +1458,24 @@ function renderMenu(){
     `).join("");
 }
 
-function deleteMenuItem(event, name){
+async function deleteMenuItem(event, name){
   event.stopPropagation();
   const key = name.toLowerCase();
+  if(sb){
+    try{
+      await sb.from("food_defs").delete().eq("name", name);
+      await loadFoodFromCloud();
+      renderMenu();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   if(foodDefs[key]){ delete foodDefs[key]; saveData("ft_food_defs", foodDefs); }
   legacyPresets = legacyPresets.filter(p => p.name.toLowerCase() !== key);
   saveData("ft_cal_presets", legacyPresets);
   renderMenu();
 }
 
-function onMenuItemClick(name){
+async function onMenuItemClick(name){
   const def = foodDefs[name.toLowerCase()];
   if(def){
     pendingMenuFood = name;
@@ -1410,7 +1485,15 @@ function onMenuItemClick(name){
   }else{
     const legacy = legacyPresets.find(p => p.name.toLowerCase() === name.toLowerCase());
     if(legacy){
-      foodLog.push({ id: uid(), date: todayStr(), name: legacy.name, cal: legacy.cal });
+      const entry = { id: uid(), date: todayStr(), name: legacy.name, cal: legacy.cal };
+      if(sb){
+        try{
+          await sb.from("food_log").insert(foodEntryToRow(entry));
+          await loadFoodFromCloud();
+          return;
+        }catch(e){ alert("Couldn't reach the server."); return; }
+      }
+      foodLog.push(entry);
       saveData("ft_cal_log", foodLog);
       renderCalories();
       renderDashboard();
@@ -1418,7 +1501,7 @@ function onMenuItemClick(name){
   }
 }
 
-function confirmMenuGrams(){
+async function confirmMenuGrams(){
   const grams = parseFloat(document.getElementById("menu-grams-input").value);
   if(!grams || grams <= 0){ alert("Enter a valid gram amount."); return; }
   const def = foodDefs[pendingMenuFood.toLowerCase()];
@@ -1428,19 +1511,31 @@ function confirmMenuGrams(){
   const carbs = def.carbsPerGram != null ? Math.round(def.carbsPerGram * grams * 10) / 10 : null;
   const fats = def.fatsPerGram != null ? Math.round(def.fatsPerGram * grams * 10) / 10 : null;
 
-  foodLog.push({ id: uid(), date: todayStr(), name: def.name, grams, cal, protein, carbs, fats });
+  const entry = { id: uid(), date: todayStr(), name: def.name, grams, cal, protein, carbs, fats };
   def.lastGrams = grams;
-  foodDefs[pendingMenuFood.toLowerCase()] = def;
-  saveData("ft_cal_log", foodLog);
-  saveData("ft_food_defs", foodDefs);
 
   document.getElementById("menu-grams-modal-backdrop").classList.add("hidden");
+  const savedName = pendingMenuFood;
   pendingMenuFood = null;
+
+  if(sb){
+    try{
+      await sb.from("food_log").insert(foodEntryToRow(entry));
+      await upsertFoodDef(def); // update lastGrams
+      await loadFoodFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
+  foodLog.push(entry);
+  foodDefs[savedName.toLowerCase()] = def;
+  saveData("ft_cal_log", foodLog);
+  saveData("ft_food_defs", foodDefs);
   renderCalories();
   renderDashboard();
 }
 
-function addCustomFood(){
+async function addCustomFood(){
   const name = document.getElementById("custom-food-name").value.trim();
   const grams = parseFloat(document.getElementById("custom-food-grams").value);
   const cal = parseInt(document.getElementById("custom-food-cal").value, 10);
@@ -1454,11 +1549,10 @@ function addCustomFood(){
   if(!isNaN(protein)){ entry.protein = protein; }
   if(!isNaN(carbs)){ entry.carbs = carbs; }
   if(!isNaN(fats)){ entry.fats = fats; }
-  foodLog.push(entry);
-  saveData("ft_cal_log", foodLog);
 
+  let def = null;
   if(grams){
-    foodDefs[name.toLowerCase()] = {
+    def = {
       name,
       calPerGram: cal / grams,
       proteinPerGram: !isNaN(protein) ? protein / grams : null,
@@ -1466,16 +1560,37 @@ function addCustomFood(){
       fatsPerGram: !isNaN(fats) ? fats / grams : null,
       lastGrams: grams
     };
-    saveData("ft_food_defs", foodDefs);
   }
 
-  ["custom-food-name","custom-food-grams","custom-food-cal","custom-food-protein","custom-food-carbs","custom-food-fats"]
+  const clearFields = () => ["custom-food-name","custom-food-grams","custom-food-cal","custom-food-protein","custom-food-carbs","custom-food-fats"]
     .forEach(id => document.getElementById(id).value = "");
+
+  if(sb){
+    try{
+      await sb.from("food_log").insert(foodEntryToRow(entry));
+      if(def) await upsertFoodDef(def);
+      clearFields();
+      await loadFoodFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
+  foodLog.push(entry);
+  saveData("ft_cal_log", foodLog);
+  if(def){ foodDefs[name.toLowerCase()] = def; saveData("ft_food_defs", foodDefs); }
+  clearFields();
   renderCalories();
   renderDashboard();
 }
 
-function deleteFoodEntry(id){
+async function deleteFoodEntry(id){
+  if(sb){
+    try{
+      await sb.from("food_log").delete().eq("id", id);
+      await loadFoodFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   foodLog = foodLog.filter(f => f.id !== id);
   saveData("ft_cal_log", foodLog);
   renderCalories();
