@@ -1098,6 +1098,7 @@ function showApp(){
     loadWeightFromCloud();
     loadStepsFromCloud();
     loadNotesFromCloud();
+    loadWalksFromCloud();
   }
 }
 
@@ -1482,6 +1483,54 @@ function renderCalories(){
 
 /* ================= WALKS ================= */
 let walks = loadData("ft_walks", []);
+let walkPhotos = loadData("ft_walk_photos", {}); // { walkId: [dataURL,...] } — stays local for now
+
+function getWalkPhotos(id){ return walkPhotos[id] || []; }
+
+function rowToWalk(r){
+  return {
+    id: r.id,
+    name: r.name || "Walk",
+    date: r.date,
+    durationMin: r.duration_min,
+    distanceMi: Number(r.distance_mi),
+    temp: r.temp != null ? Number(r.temp) : null,
+    location: r.location || "",
+    path: r.path || [],
+    manual: !!r.manual,
+    photos: getWalkPhotos(r.id)
+  };
+}
+function walkToRow(w){
+  return {
+    name: w.name || "Walk",
+    date: w.date,
+    duration_min: w.durationMin,
+    distance_mi: w.distanceMi,
+    temp: w.temp,
+    location: w.location || "",
+    path: w.path || [],
+    manual: !!w.manual
+  };
+}
+
+async function loadWalksFromCloud(){
+  if(!sb) return;
+  try{
+    const { data, error } = await sb.from("walks_entries").select("*").order("date");
+    if(error){ console.warn("walks load error", error.message); return; }
+    walks = data.map(rowToWalk);
+    saveData("ft_walks", walks);
+    renderWalks();
+    renderWalkMileage();
+    renderWalkPace();
+    renderPaceChart();
+    renderWalkBrowseList();
+    renderDashboard();
+    renderDashMileage();
+    renderCalendar();
+  }catch(e){ console.warn("walks load failed", e); }
+}
 let walkState = null;
 let pendingPhotos = [];
 let pendingWalkForPhotos = null;
@@ -1581,7 +1630,7 @@ function stopWalk(){
   document.getElementById("finish-walk-modal-backdrop").classList.remove("hidden");
 }
 
-function confirmFinishWalk(){
+async function confirmFinishWalk(){
   if(!pendingFinishWalk) return;
   const name = document.getElementById("finish-walk-name").value.trim() || "Walk";
   const temp = document.getElementById("finish-walk-temp").value;
@@ -1591,18 +1640,29 @@ function confirmFinishWalk(){
   pendingFinishWalk.temp = temp ? parseFloat(temp) : null;
   pendingFinishWalk.location = location;
 
+  document.getElementById("finish-walk-modal-backdrop").classList.add("hidden");
+
+  if(sb){
+    try{
+      const { data, error } = await sb.from("walks_entries").insert(walkToRow(pendingFinishWalk)).select().single();
+      if(error){ alert("Couldn't save walk to cloud: " + error.message); return; }
+      pendingFinishWalk = null;
+      await loadWalksFromCloud();
+      openPhotoModal(data.id); // attach photos to the cloud walk's real id (photos stay local)
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
   walks.push(pendingFinishWalk);
   saveData("ft_walks", walks);
   const savedId = pendingFinishWalk.id;
   pendingFinishWalk = null;
-
-  document.getElementById("finish-walk-modal-backdrop").classList.add("hidden");
   renderWalks();
   renderDashboard();
   openPhotoModal(savedId);
 }
 
-function addManualWalk(){
+async function addManualWalk(){
   const name = document.getElementById("mwalk-name").value.trim() || "Walk";
   const date = document.getElementById("mwalk-date").value || todayStr();
   const durationMin = parseInt(document.getElementById("mwalk-duration").value, 10);
@@ -1616,16 +1676,36 @@ function addManualWalk(){
     temp: temp ? parseFloat(temp) : null,
     location, path: [], photos: [], manual: true
   };
+
+  if(sb){
+    try{
+      const { error } = await sb.from("walks_entries").insert(walkToRow(walk));
+      if(error){ alert("Couldn't save walk to cloud: " + error.message); return; }
+      ["mwalk-name","mwalk-duration","mwalk-distance","mwalk-temp","mwalk-location"].forEach(id => document.getElementById(id).value = "");
+      await loadWalksFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
   walks.push(walk);
   saveData("ft_walks", walks);
-
   ["mwalk-name","mwalk-duration","mwalk-distance","mwalk-temp","mwalk-location"].forEach(id => document.getElementById(id).value = "");
   renderWalks();
   renderDashboard();
 }
 
-function deleteWalk(id){
+async function deleteWalk(id){
+  if(sb){
+    try{
+      const { error } = await sb.from("walks_entries").delete().eq("id", id);
+      if(error){ alert("Couldn't delete: " + error.message); return; }
+      if(walkPhotos[id]){ delete walkPhotos[id]; saveData("ft_walk_photos", walkPhotos); }
+      await loadWalksFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   walks = walks.filter(w => w.id !== id);
+  if(walkPhotos[id]){ delete walkPhotos[id]; saveData("ft_walk_photos", walkPhotos); }
   saveData("ft_walks", walks);
   renderWalks();
   renderDashboard();
@@ -1651,10 +1731,12 @@ function openPhotoModal(walkId){
   document.getElementById("photo-modal-backdrop").classList.remove("hidden");
 }
 function closePhotoModal(){
-  const walk = walks.find(w => w.id === pendingWalkForPhotos);
-  if(walk && pendingPhotos.length){
-    walk.photos = (walk.photos || []).concat(pendingPhotos);
-    saveData("ft_walks", walks);
+  if(pendingWalkForPhotos && pendingPhotos.length){
+    walkPhotos[pendingWalkForPhotos] = (walkPhotos[pendingWalkForPhotos] || []).concat(pendingPhotos);
+    saveData("ft_walk_photos", walkPhotos);
+    // reflect on the in-memory walk too so it shows immediately
+    const walk = walks.find(w => w.id === pendingWalkForPhotos);
+    if(walk){ walk.photos = walkPhotos[pendingWalkForPhotos]; }
     renderWalks();
   }
   document.getElementById("photo-modal-backdrop").classList.add("hidden");
