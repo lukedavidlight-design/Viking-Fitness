@@ -1140,7 +1140,13 @@ function saveData(key, value){
   catch(e){ alert("Storage is full — try removing some walk photos to free up space."); }
 }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
+}
 function fmtDate(d){
   const dt = new Date(d + "T00:00:00");
   return dt.toLocaleDateString(undefined, { month:"short", day:"numeric" });
@@ -1694,6 +1700,7 @@ async function loadWalksFromCloud(){
     renderDashboard();
     renderDashMileage();
     renderCalendar();
+    loadAllWalkPhotos(); // fetch photos for each walk from storage
   }catch(e){ console.warn("walks load failed", e); }
 }
 let walkState = null;
@@ -1862,6 +1869,16 @@ async function addManualWalk(){
 async function deleteWalk(id){
   if(sb){
     try{
+      // remove photos from storage first
+      try{
+        const { data: userData } = await sb.auth.getUser();
+        const folder = `${userData.user.id}/${id}`;
+        const { data: files } = await sb.storage.from("walk-photos").list(folder);
+        if(files && files.length){
+          await sb.storage.from("walk-photos").remove(files.map(f => `${folder}/${f.name}`));
+        }
+      }catch(e){ console.warn("photo cleanup failed", e); }
+
       const { error } = await sb.from("walks_entries").delete().eq("id", id);
       if(error){ alert("Couldn't delete: " + error.message); return; }
       if(walkPhotos[id]){ delete walkPhotos[id]; saveData("ft_walk_photos", walkPhotos); }
@@ -1895,19 +1912,74 @@ function openPhotoModal(walkId){
   document.getElementById("walk-photo-input").value = "";
   document.getElementById("photo-modal-backdrop").classList.remove("hidden");
 }
-function closePhotoModal(){
+
+async function closePhotoModal(){
+  const backdrop = document.getElementById("photo-modal-backdrop");
   if(pendingWalkForPhotos && pendingPhotos.length){
-    walkPhotos[pendingWalkForPhotos] = (walkPhotos[pendingWalkForPhotos] || []).concat(pendingPhotos);
-    saveData("ft_walk_photos", walkPhotos);
-    // reflect on the in-memory walk too so it shows immediately
-    const walk = walks.find(w => w.id === pendingWalkForPhotos);
-    if(walk){ walk.photos = walkPhotos[pendingWalkForPhotos]; }
-    renderWalks();
+    if(sb){
+      // upload each pending photo to Supabase Storage
+      try{
+        const { data: userData } = await sb.auth.getUser();
+        const uid_ = userData.user.id;
+        for(let i = 0; i < pendingPhotos.length; i++){
+          const blob = dataURLtoBlob(pendingPhotos[i]);
+          const path = `${uid_}/${pendingWalkForPhotos}/${Date.now()}_${i}.jpg`;
+          const { error } = await sb.storage.from("walk-photos").upload(path, blob, { contentType: "image/jpeg" });
+          if(error){ console.warn("photo upload error", error.message); }
+        }
+        await loadWalkPhotos(pendingWalkForPhotos);
+        renderWalks();
+      }catch(e){ alert("Couldn't upload photos. Check your connection."); }
+    }else{
+      walkPhotos[pendingWalkForPhotos] = (walkPhotos[pendingWalkForPhotos] || []).concat(pendingPhotos);
+      saveData("ft_walk_photos", walkPhotos);
+      const walk = walks.find(w => w.id === pendingWalkForPhotos);
+      if(walk){ walk.photos = walkPhotos[pendingWalkForPhotos]; }
+      renderWalks();
+    }
   }
-  document.getElementById("photo-modal-backdrop").classList.add("hidden");
+  backdrop.classList.add("hidden");
   pendingWalkForPhotos = null;
   pendingPhotos = [];
 }
+
+function dataURLtoBlob(dataURL){
+  const parts = dataURL.split(",");
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8 = new Uint8Array(n);
+  while(n--){ u8[n] = bstr.charCodeAt(n); }
+  return new Blob([u8], { type: mime });
+}
+
+async function loadWalkPhotos(walkId){
+  if(!sb) return;
+  try{
+    const { data: userData } = await sb.auth.getUser();
+    const uid_ = userData.user.id;
+    const folder = `${uid_}/${walkId}`;
+    const { data: files, error } = await sb.storage.from("walk-photos").list(folder);
+    if(error){ console.warn("photo list error", error.message); return; }
+    const urls = [];
+    for(const f of (files || [])){
+      const { data: signed } = await sb.storage.from("walk-photos").createSignedUrl(`${folder}/${f.name}`, 3600);
+      if(signed && signed.signedUrl) urls.push(signed.signedUrl);
+    }
+    walkPhotos[walkId] = urls;
+    const walk = walks.find(w => w.id === walkId);
+    if(walk){ walk.photos = urls; }
+  }catch(e){ console.warn("load walk photos failed", e); }
+}
+
+async function loadAllWalkPhotos(){
+  if(!sb) return;
+  for(const w of walks){
+    await loadWalkPhotos(w.id);
+  }
+  renderWalks();
+}
+
 document.getElementById("walk-photo-input").addEventListener("change", function(e){
   const files = Array.from(e.target.files || []).slice(0, 6);
   const preview = document.getElementById("walk-photo-preview");
@@ -2679,7 +2751,7 @@ function renderTodayPlan(){
   const today = todayStr();
   const items = [];
   goals.forEach(g => g.steps.forEach(s => {
-    if(s.date === today) items.push({ goal: g, step: s });
+    if(s.date && String(s.date).slice(0,10) === today) items.push({ goal: g, step: s });
   }));
   if(items.length === 0){
     el.innerHTML = '<div class="empty">Nothing scheduled today.</div>';

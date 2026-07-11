@@ -1,4 +1,4 @@
-const CACHE_NAME = "trailhead-cache-v22";
+const CACHE_NAME = "trailhead-cache-v23";
 const ASSETS = [
   "./",
   "./index.html",
