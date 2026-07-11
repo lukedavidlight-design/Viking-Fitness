@@ -1124,6 +1124,7 @@ function showApp(){
     loadNotesFromCloud();
     loadWalksFromCloud();
     loadFoodFromCloud();
+    loadGoalsFromCloud();
   }
 }
 
@@ -2290,25 +2291,93 @@ let goals = loadData("ft_goals", []); // {id, name, targetDate, desc, steps:[{id
 let stepModalGoalId = null;
 let pendingImport = null; // {goalId, steps:[]}
 
-function addGoal(){
+async function loadGoalsFromCloud(){
+  if(!sb) return;
+  try{
+    const { data: goalRows, error: e1 } = await sb.from("goals").select("*").order("created_at");
+    if(e1){ console.warn("goals load error", e1.message); return; }
+    const { data: stepRows, error: e2 } = await sb.from("goal_steps").select("*").order("sort_order");
+    if(e2){ console.warn("goal steps load error", e2.message); return; }
+
+    goals = goalRows.map(g => ({
+      id: g.id,
+      name: g.name,
+      targetDate: g.target_date || null,
+      desc: g.description || "",
+      steps: stepRows
+        .filter(s => s.goal_id === g.id)
+        .map(s => ({
+          id: s.id,
+          date: s.date || null,
+          plan: s.plan,
+          distance: s.distance || null,
+          effort: s.effort || null,
+          done: !!s.done
+        }))
+    }));
+    saveData("ft_goals", goals);
+    renderGoals();
+    renderCalendar();
+    renderTodayPlan();
+  }catch(e){ console.warn("goals load failed", e); }
+}
+
+function stepToRow(goalId, s, order){
+  return {
+    goal_id: goalId,
+    date: s.date || null,
+    plan: s.plan,
+    distance: s.distance || null,
+    effort: s.effort || null,
+    done: !!s.done,
+    sort_order: order
+  };
+}
+
+async function addGoal(){
   const name = document.getElementById("goal-name").value.trim();
   const targetDate = document.getElementById("goal-target-date").value;
   const desc = document.getElementById("goal-desc").value.trim();
   if(!name){ alert("Give the goal a name."); return; }
+
+  const clearFields = () => {
+    document.getElementById("goal-name").value = "";
+    document.getElementById("goal-target-date").value = "";
+    document.getElementById("goal-desc").value = "";
+    collapseCard(document.querySelector('[data-bid="tab-goals:createanewgoal"]'));
+  };
+
+  if(sb){
+    try{
+      const { error } = await sb.from("goals").insert({ name, target_date: targetDate || null, description: desc });
+      if(error){ alert("Couldn't save goal: " + error.message); return; }
+      clearFields();
+      await loadGoalsFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
   goals.push({ id: uid(), name, targetDate: targetDate || null, desc, steps: [] });
   saveData("ft_goals", goals);
-  document.getElementById("goal-name").value = "";
-  document.getElementById("goal-target-date").value = "";
-  document.getElementById("goal-desc").value = "";
-  collapseCard(document.querySelector('[data-bid="tab-goals:createanewgoal"]'));
+  clearFields();
   renderGoals();
   renderCalendar();
   renderTodayPlan();
 }
+
 let pendingDeleteGoalId = null;
-function deleteGoal(id){
+async function deleteGoal(id){
   if(pendingDeleteGoalId === id){
     pendingDeleteGoalId = null;
+    if(sb){
+      try{
+        // cascade delete removes steps automatically
+        const { error } = await sb.from("goals").delete().eq("id", id);
+        if(error){ alert("Couldn't delete: " + error.message); return; }
+        await loadGoalsFromCloud();
+        return;
+      }catch(e){ alert("Couldn't reach the server."); return; }
+    }
     goals = goals.filter(g => g.id !== id);
     saveData("ft_goals", goals);
     renderGoals(); renderCalendar(); renderTodayPlan();
@@ -2320,6 +2389,7 @@ function deleteGoal(id){
     if(pendingDeleteGoalId === id){ pendingDeleteGoalId = null; renderGoals(); }
   }, 4000);
 }
+
 function openStepModal(goalId){
   stepModalGoalId = goalId;
   ["gstep-date","gstep-distance","gstep-plan","gstep-effort"].forEach(id => document.getElementById(id).value = "");
@@ -2329,35 +2399,68 @@ function closeStepModal(){
   document.getElementById("goal-step-modal-backdrop").classList.add("hidden");
   stepModalGoalId = null;
 }
-function confirmAddStep(){
+
+async function confirmAddStep(){
   const goal = goals.find(g => g.id === stepModalGoalId);
   if(!goal) return;
   const plan = document.getElementById("gstep-plan").value.trim();
   if(!plan){ alert("Describe the step."); return; }
-  goal.steps.push({
+  const step = {
     id: uid(),
     date: document.getElementById("gstep-date").value || null,
     plan,
     distance: document.getElementById("gstep-distance").value.trim() || null,
     effort: document.getElementById("gstep-effort").value.trim() || null,
     done: false
-  });
+  };
+
+  if(sb){
+    try{
+      const order = goal.steps.length;
+      const { error } = await sb.from("goal_steps").insert(stepToRow(goal.id, step, order));
+      if(error){ alert("Couldn't save step: " + error.message); return; }
+      closeStepModal();
+      await loadGoalsFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
+  goal.steps.push(step);
   goal.steps.sort((a,b) => (a.date || "9999").localeCompare(b.date || "9999"));
   saveData("ft_goals", goals);
   closeStepModal();
   renderGoals(); renderCalendar(); renderTodayPlan();
 }
-function toggleStep(goalId, stepId){
+
+async function toggleStep(goalId, stepId){
   const goal = goals.find(g => g.id === goalId);
   if(!goal) return;
   const step = goal.steps.find(s => s.id === stepId);
   if(!step) return;
-  step.done = !step.done;
-  saveData("ft_goals", goals);
+  const newDone = !step.done;
+  step.done = newDone; // optimistic update
   renderGoals(); renderTodayPlan();
-  // refresh day modal if open
+
+  if(sb){
+    try{
+      const { error } = await sb.from("goal_steps").update({ done: newDone }).eq("id", stepId);
+      if(error){ step.done = !newDone; renderGoals(); alert("Couldn't update: " + error.message); return; }
+      saveData("ft_goals", goals);
+      return;
+    }catch(e){ step.done = !newDone; renderGoals(); alert("Couldn't reach the server."); return; }
+  }
+  saveData("ft_goals", goals);
 }
-function deleteStep(goalId, stepId){
+
+async function deleteStep(goalId, stepId){
+  if(sb){
+    try{
+      const { error } = await sb.from("goal_steps").delete().eq("id", stepId);
+      if(error){ alert("Couldn't delete: " + error.message); return; }
+      await loadGoalsFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
   const goal = goals.find(g => g.id === goalId);
   if(!goal) return;
   goal.steps = goal.steps.filter(s => s.id !== stepId);
@@ -2540,16 +2643,28 @@ function handleGoalImportFile(event){
   };
   reader.readAsArrayBuffer(file);
 }
-function confirmImportSteps(){
+async function confirmImportSteps(){
   if(!pendingImport) return;
   const goal = goals.find(g => g.id === pendingImport.goalId);
-  if(goal){
-    goal.steps = goal.steps.concat(pendingImport.steps);
-    goal.steps.sort((a,b) => (a.date || "9999").localeCompare(b.date || "9999"));
-    saveData("ft_goals", goals);
-  }
+  const steps = pendingImport.steps;
   pendingImport = null;
   document.getElementById("import-preview-modal-backdrop").classList.add("hidden");
+  if(!goal) return;
+
+  if(sb){
+    try{
+      const baseOrder = goal.steps.length;
+      const rows = steps.map((s, i) => stepToRow(goal.id, s, baseOrder + i));
+      const { error } = await sb.from("goal_steps").insert(rows);
+      if(error){ alert("Couldn't save imported steps: " + error.message); return; }
+      await loadGoalsFromCloud();
+      return;
+    }catch(e){ alert("Couldn't reach the server."); return; }
+  }
+
+  goal.steps = goal.steps.concat(steps);
+  goal.steps.sort((a,b) => (a.date || "9999").localeCompare(b.date || "9999"));
+  saveData("ft_goals", goals);
   renderGoals(); renderCalendar(); renderTodayPlan();
 }
 function cancelImportSteps(){
